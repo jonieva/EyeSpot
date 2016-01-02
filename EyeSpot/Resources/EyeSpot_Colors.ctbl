@@ -1,0 +1,7 @@
+# Color table file /Users/jonieva/Projects/jorge/EyeSpot/EyeSpot/Resources/EyeSpot_Colors.ctbl
+# 5 values
+0 background 0 0 0 0
+1 Red_Lesion 255 0 0 255
+2 White_Lesion 255 255 255 255
+3 Exudade 85 170 127 255
+4 Glaucoma 255 255 127 255
