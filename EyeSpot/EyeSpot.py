@@ -4,6 +4,7 @@ import os, sys
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import re
 
 
 import ui
@@ -103,12 +104,17 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         row += 1
 
 
-        # Enhancement
+        # Enhancement. TODO: replace with a radio button to allow quick display of just original and just enhanced
         row += 1
         self.showEnhancementCheckbox = qt.QCheckBox()
         self.showEnhancementCheckbox.setText("Show enhancement")
         self.showEnhancementCheckbox.setEnabled(False)
         self.mainAreaLayout.addWidget(self.showEnhancementCheckbox, row, 0)
+
+        row += 1
+        self.printReportButton = ctk.ctkPushButton()
+        self.printReportButton.text = "Print report"
+        self.mainAreaLayout.addWidget(self.printReportButton, row, 0)
 
         # Reset button
         row += 1
@@ -132,6 +138,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         # Connections
         self.loadImageButton.connect('clicked()', self.__onLoadImageClicked__)
         self.loadReportButton.connect('clicked()', self.__onLoadReportClicked__)
+        self.printReportButton.connect('clicked()', self.__onPrintReportClicked__)
         self.resetButton.connect('clicked()', self.reset)
         self.showEnhancementCheckbox.connect("stateChanged(int)", self.__onshowEnhancementCheckboxStateChanged__)
 
@@ -200,6 +207,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
     def reset(self):
         slicer.mrmlScene.Clear(0)
+        self.showEnhancementCheckbox.setChecked(False)
         self.__initVars__()
         self.refreshUI()
 
@@ -234,6 +242,9 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
                 selectionNode.SetReferenceActiveLabelVolumeID(volume.GetID())
                 slicer.app.applicationLogic().PropagateVolumeSelection(0)
                 self.currentLabelmapPath = f
+
+    def __onPrintReportClicked__(self):
+        self.logic.generateHtml(self.reportText.plainText)
 
     def __onshowEnhancementCheckboxStateChanged__(self, state):
         # Get the enhanced volume
@@ -272,7 +283,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         self.currentAnnotationsPath = None
         self.enhancedVolume = None
 
-        p = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Resources", "EyeSpot_Colors.ctbl")
+        p = self.getResourcePath("EyeSpot_Colors.ctbl")
         self.colorTableNode = slicer.modules.colors.logic().LoadColorFile(p)
 
     def getFolder(self, volume):
@@ -322,10 +333,52 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
     def __calculateEnhancedVolume__(self):
         self.enhancedVolume = self.current2DVolume
 
+    def getResourcePath(self, fileName):
+        """ Get a full path for the current resoure file name
+        :param fileName:
+        :return: full path to the corresponding file name in the Resources folder
+        """
+        return os.path.join(os.path.dirname(os.path.realpath(__file__)), "Resources", fileName)
+
     def printMessage(self, message):
         print("This is your message: ", message)
         return "I have printed this message: " + message
 
+    def generateHtml(self, reportText):
+        """ Generate an html report based on the default template
+        :param reportText: text of the report
+        :return: html generated
+        """
+        templatePath = self.getResourcePath("EyeSpot_ReportTemplate.html")
+        with open(templatePath, "r+b") as f:
+            html = f.read()
+
+        # Replace the description
+        #expr = ".*<div id=\"divDescription\">(.*)</div>"
+        #m = re.match(expr, s, re.DOTALL)
+        repl = '''
+<div id="divDescription">
+(Description)
+</div>'''
+        myText = '''
+<div id="divDescription">
+{0}
+</div>'''.format(self.__toHtml__(reportText))
+        html = html.replace(repl, myText)
+        print("Replaced text:")
+        print(html)
+
+        # save the file
+        p = os.path.join(SlicerUtil.getModuleFolder("EyeSpot"), "results", "temp.html")
+        print p
+        with open(p, "w+b") as f:
+            f.write(html)
+        return html
+
+    def __toHtml__(self, text):
+        text = text.encode('ascii', 'xmlcharrefreplace')
+        text = text.replace("\n", "<br/>")
+        return text
 
 
 class EyeSpotTest(ScriptedLoadableModuleTest):
@@ -358,3 +411,49 @@ class EyeSpotTest(ScriptedLoadableModuleTest):
         logging.info("The response message was: " + responseMessage)
         self.assertTrue(responseMessage == expectedMessage)
         self.delayDisplay('Test passed!')
+
+# import re
+# s='''
+# <html>
+# <head>
+# <meta content="text/html; charset=ISO-8859-1"
+# http-equiv="content-type">
+# <title>EyeSpot</title>
+# <style type="text/css">
+# #divDescription {
+# margin-bottom: 15px;
+# margin-top: 15px;
+# }
+#
+# </style>
+# </head>
+# <body>
+# <big style="font-weight: bold;">EyeSpot Report</big><br>
+# <div id="divDescription">
+# (Description)
+# </div>
+# <img id="img1" style="width: 400px;" alt="eye_fundus"
+# src="file:///Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png"><br>
+# <br>
+# </body>
+# </html>
+# '''
+#
+#
+# repl = '''<div id="divDescription">
+# (Description)
+# </div>'''
+# myText = '''
+# <div id="divDescription">
+# New description
+# </div>
+# '''
+# s.replace(repl, myText)
+#
+#
+#
+# expr = ".*<div id=\"divDescription\">(?P<descr>.*)</div>"
+# m = re.match(expr, s, re.DOTALL)
+# repl = "\g<descr>my description"
+# re.sub(expr, repl, s, flags=re.DOTALL)
+# m.group(1)
