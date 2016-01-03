@@ -5,8 +5,7 @@
     <title>EyeSpot</title>
     <style  type="text/css">
 #divDescription {
-  margin-bottom: 15px;
-  margin-top: 15px;
+  margin: 15px;
 }
 
 body {
@@ -30,26 +29,30 @@ page[size="A4"] {
 
   </style>
   </head>
-  <body> 
+  <body>
     <div  class="page">
-      <div  width:100%=""> Aqui va el logo </div>
-      <big  style="font-weight: bold;">EyeSpot Report</big><br>
-    
-      <div  style="width: 50%; float: left;">
-        <div  style="width: 830px;"  id="divdescription"> Esto es una
-          descripcion larga para ver cómo va a quedar la cosa. Si sigo
-          esctribiendo esto va a quedar bastante largo<br>
+      <div  width:100%=""> <img  alt="logo"  src="logo.png"></div>
+      <h1>EyeSpot Report</h1>
+      <div  style="width: 660px; float: left;">
+        <div id="divDescription"> Paciente: @@PATIENT@@<br>
+          Esto es una descripcion larga para ver cómo va a quedar la cosa. Si
+          sigo esctribiendo esto va a quedar a bastante largo pero
+          bueno que se vaya a dos líneas.<br>
           Deberíamos tener un borde y tal <br>
           <br>
           A ver qué tal esta <br>
           <br>
           Fin de la cita </div>
       </div>
-      <div  style="width: 50%; float:right; text-align: right;"><img  id="img1"
-           style="width: 500px; margin-left: -100px;"
+      <div  id="divImages"  style="width: 600px; float:right; text-align: right;">&nbsp;
+        gfdggf<img  id="imgOriginal"  style="width: 600px; margin-left: -100px;"
            alt="eye_fundus"
-           src="../../../../../../../Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png"></div>
+           src="../../../../../../../Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png">
+        <img  id="imgAnnotated"  style="width: 600px; margin-left: -100px;"  alt="eye_fundus"
+           src="../../../../../../../Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png">
+        <img  id="imgEnhanced"  style="width: 600px; margin-left: -100px;"  alt="eye_fundus"
+           src="../../../../../../../Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png">
+      </div>
     </div>
-    
   </body>
 </html>
