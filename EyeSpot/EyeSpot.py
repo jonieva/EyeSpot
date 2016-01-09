@@ -100,16 +100,30 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         # self.labelmapSelector.enabled = False
         # self.mainAreaLayout.addWidget(self.labelmapSelector, row, 1)
 
-        # Report
-        row += 1
-
-
         # Enhancement. TODO: replace with a radio button to allow quick display of just original and just enhanced
         row += 1
-        self.showEnhancementCheckbox = qt.QCheckBox()
-        self.showEnhancementCheckbox.setText("Show enhancement")
-        self.showEnhancementCheckbox.setEnabled(False)
-        self.mainAreaLayout.addWidget(self.showEnhancementCheckbox, row, 0)
+        self.showEnhancementCheckboxGroup = qt.QButtonGroup()
+        self.showJustOriginalButton = qt.QRadioButton("Original only")
+        self.showJustOriginalButton.setChecked(True)
+        self.showEnhancementCheckboxGroup.addButton(self.showJustOriginalButton, 0)
+        self.mainAreaLayout.addWidget(self.showJustOriginalButton, row, 0)
+
+        row += 1
+        self.showOriginalPlusEnhancedButton = qt.QRadioButton("Original and enhanced")
+        self.showEnhancementCheckboxGroup.addButton(self.showOriginalPlusEnhancedButton, 1)
+        self.mainAreaLayout.addWidget(self.showOriginalPlusEnhancedButton, row, 0)
+
+        row += 1
+        self.showJustEnhancedButton = qt.QRadioButton("Enhanced only")
+        self.showEnhancementCheckboxGroup.addButton(self.showJustEnhancedButton, 2)
+        self.mainAreaLayout.addWidget(self.showJustEnhancedButton, row, 0)
+
+        #
+        #
+        # self.showEnhancementCheckbox = qt.QCheckBox()
+        # self.showEnhancementCheckbox.setText("Show enhancement")
+        # self.showEnhancementCheckbox.setEnabled(False)
+        # self.mainAreaLayout.addWidget(self.showEnhancementCheckbox, row, 0)
 
         row += 1
         self.printReportButton = ctk.ctkPushButton()
@@ -139,25 +153,36 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.loadImageButton.connect('clicked()', self.__onLoadImageClicked__)
         self.loadReportButton.connect('clicked()', self.__onLoadReportClicked__)
         self.printReportButton.connect('clicked()', self.__onPrintReportClicked__)
+        self.showEnhancementCheckboxGroup.connect("buttonClicked (int)", self.__onEnhancementButtonGroupClicked__)
         self.resetButton.connect('clicked()', self.reset)
-        self.showEnhancementCheckbox.connect("stateChanged(int)", self.__onshowEnhancementCheckboxStateChanged__)
 
 
-    def refreshUI(self):
-        self.loadReportButton.enabled = self.logic.current2DVolume is not None
-        self.showEnhancementCheckbox.enabled = self.logic.current2DVolume is not None
-        
-        if self.showEnhancementCheckbox.isChecked():
-            # Two windows
-            SlicerUtil.changeLayout(29)
-        else:
-            # Red Slice only
-            SlicerUtil.changeLayout(6)
-
+        SlicerUtil.changeLayout(6)
         compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
         for compNode in compNodes.itervalues():
             compNode.SetLinkedControl(True)
             compNode.SetLabelOpacity(0.3)
+
+    def refreshUI(self):
+        self.loadReportButton.enabled = self.logic.current2DVolume is not None
+        for button in self.showEnhancementCheckboxGroup.buttons():
+            button.setEnabled(self.logic.current2DVolume is not None)
+        
+        # if self.showEnhancementCheckbox.isChecked():
+        #     # Two windows
+        #     SlicerUtil.changeLayout(29)
+        # else:
+        #     # Red Slice only
+        #     SlicerUtil.changeLayout(6)
+        if self.showEnhancementCheckboxGroup.checkedId() == 0:
+            # Just original. Red Slice only
+            SlicerUtil.changeLayout(6)
+        elif self.showEnhancementCheckboxGroup.checkedId() == 1:
+            # Original + Enhanced
+            SlicerUtil.changeLayout(29)
+        elif self.showEnhancementCheckboxGroup.checkedId() == 2:
+            # Just enhanced. Yellow Slice
+            SlicerUtil.changeLayout(7)
 
         self.editorCollapsibleButton.visible = self.logic.currentLabelmapVolume is not None
 
@@ -207,7 +232,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
     def reset(self):
         slicer.mrmlScene.Clear(0)
-        self.showEnhancementCheckbox.setChecked(False)
+        self.showEnhancementCheckboxGroup.buttons()[0].setChecked(True)
         self.__initVars__()
         self.refreshUI()
 
@@ -246,20 +271,38 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
     def __onPrintReportClicked__(self):
         self.logic.generateHtml(self.reportText.plainText)
 
-    def __onshowEnhancementCheckboxStateChanged__(self, state):
-        # Get the enhanced volume
-        enhancedVol = self.logic.getEnhancedVolume()
-        # Assign it to the yellow slice
-        slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow').SetBackgroundVolumeID(enhancedVol.GetID())
-        slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow').SetOrientationToAxial()
+    # def __onshowEnhancementCheckboxStateChanged__(self, state):
+    #     # Get the enhanced volume
+    #     enhancedVol = self.logic.getEnhancedVolume()
+    #     # Assign it to the yellow slice
+    #     slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow').SetBackgroundVolumeID(enhancedVol.GetID())
+    #     slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow').SetOrientationToAxial()
+    #
+    #     # Link all the controls
+    #     compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
+    #     for compNode in compNodes.itervalues():
+    #         compNode.SetLinkedControl(True)
+    #     SlicerUtil.centerAllVolumes()
+    #     SlicerUtil.refreshActiveWindows()
+    #     self.refreshUI()
 
-        # Link all the controls
-        compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
-        for compNode in compNodes.itervalues():
-            compNode.SetLinkedControl(True)
-        SlicerUtil.centerAllVolumes()
-        SlicerUtil.refreshActiveWindows()
+    def __onEnhancementButtonGroupClicked__(self, buttonId):
         self.refreshUI()
+
+        if buttonId in (1,2):
+            sliceNodeYellow = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow')
+            # Get the enhanced volume
+            enhancedVol = self.logic.getEnhancedVolume()
+            # Assign it to the yellow slice
+            slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow').SetBackgroundVolumeID(enhancedVol.GetID())
+            sliceNodeYellow.SetOrientationToAxial()
+            # Assign the labelmap
+            slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow').SetLabelVolumeID(self.logic.currentLabelmapVolume.GetID())
+            # Set the same field of view for the enhanced volume
+            fov = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetFieldOfView()
+            # We divide the first coordinate
+            sliceNodeYellow.SetFieldOfView(fov[0], fov[1], 1)
+
 
 #
 # EyeSpotLogic
