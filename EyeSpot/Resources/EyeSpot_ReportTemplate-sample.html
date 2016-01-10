@@ -1,0 +1,61 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <meta  content="text/html; charset=ISO-8859-1"  http-equiv="content-type">
+    <title>EyeSpot</title>
+    <style  type="text/css">
+      divDescription {
+        margin: 15px;
+      }
+
+      body {
+        
+      }
+      page[size="A4"] {
+        background: white;
+        width: 21cm;
+        height: 29.7cm;
+        display: block;
+        margin: 0 auto;
+        margin-bottom: 0.5cm;
+        box-shadow: 0 0 0.5cm rgba(0,0,0,0.5);
+      }
+      @media print {
+        body, page[size="A4"] {
+          margin: 0;
+          box-shadow: 0;
+        }
+      }
+      .eyeimg {
+        width: 600px; 
+        margin-left: -100px;
+      }
+      .hidden {
+        display: none;
+      }
+
+  </style>
+  </head>
+  <body>
+    <div  class="page">
+      <div  width:100%=""> <img  alt="logo"  src="logo.png"></div>
+      <h1>EyeSpot Report</h1>
+      <div  style="width: 660px; float: left;">
+        <div  id="divDescription"> Paciente: @@PATIENT@@<br>
+          Esto es una descripcion larga para ver cómo va a quedar la cosa. Si
+          sigo esctribiendo esto va a quedar a bastante largo pero
+          bueno que se vaya a dos líneas.<br>
+          Deberíamos tener un borde y tal <br>
+          <br>
+          A ver qué tal esta <br>
+          <br>
+          Fin de la cita </div>
+      </div>
+      <div  id="divImages"  style="width: 600px; float:right; text-align: right;">
+        <img  id="imgOriginal"  class="eyeimg"  alt="eye_fundus"  src="/Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png">
+        <img  id="imgAnnotated"  class="eyeimg"  alt="eye_fundus"  src="/Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png">
+        <img  id="imgEnhanced"  class="eyeimg"  alt="eye_fundus"  src="/Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png">
+      </div>
+    </div>
+  </body>
+</html>

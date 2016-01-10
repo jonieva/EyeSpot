@@ -4,8 +4,6 @@ import os, sys
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
-import re
-
 
 import ui
 from logic import *
@@ -45,17 +43,65 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
 
-        self.mainAreaCollapsibleButton = ctk.ctkCollapsibleButton()
-        self.mainAreaCollapsibleButton.text = "Image and labels"
-        self.mainAreaCollapsibleButton.collapsed = False
-        self.layout.addWidget(self.mainAreaCollapsibleButton)
-        self.mainAreaLayout = qt.QGridLayout(self.mainAreaCollapsibleButton)
-        # Select image
+        self.caseInfoCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.caseInfoCollapsibleButton.text = "Case information"
+        self.caseInfoCollapsibleButton.collapsed = False
+        self.layout.addWidget(self.caseInfoCollapsibleButton)
+        self.caseAreaLayout = qt.QGridLayout(self.caseInfoCollapsibleButton)
+        # Select case
         row = 0
-        self.loadImageButton = ctk.ctkPushButton()
-        self.loadImageButton .text = "Load image"
-        self.loadImageButton .toolTip = "Load the image"
-        self.mainAreaLayout.addWidget(self.loadImageButton, row, 0)
+        self.loadCaseButton = ctk.ctkPushButton()
+        self.loadCaseButton.text = "Load case"
+        self.loadCaseButton.toolTip = "Load a case folder"
+        self.caseAreaLayout.addWidget(self.loadCaseButton, row, 0)
+
+        # Reset button
+        self.resetButton = ctk.ctkPushButton()
+        self.resetButton.text = "Close case"
+        self.resetButton.toolTip = "Close the current case"
+        self.caseAreaLayout.addWidget(self.resetButton, row, 1)
+
+        # Case info
+        row += 1
+        self.caseInfoFrame = qt.QFrame()
+        self.caseInfoFrame.setFrameStyle(0x0002 | 0x0010)
+        self.caseInfoFrame.lineWidth = 2
+        self.caseInfoFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
+        self.caseAreaLayout.addWidget(self.caseInfoFrame, row, 0, 1, 2)
+
+        self.caseInfoFrameLayout = qt.QVBoxLayout()
+        self.caseInfoFrame.setLayout(self.caseInfoFrameLayout)
+
+        self.caseIdLabel = qt.QLabel("Case id: ")
+        self.caseInfoFrameLayout.addWidget(self.caseIdLabel)
+
+        self.caseInfoFrameLayout.addWidget(qt.QLabel("Display the following images:"))
+
+        self.showEnhancementCheckboxGroup = qt.QButtonGroup()
+        self.showJustOriginalButton = qt.QRadioButton("Original only")
+        self.showJustOriginalButton.setChecked(True)
+        self.showEnhancementCheckboxGroup.addButton(self.showJustOriginalButton, 0)
+        self.caseInfoFrameLayout.addWidget(self.showJustOriginalButton)
+
+        self.showOriginalPlusEnhancedButton = qt.QRadioButton("Original and enhanced")
+        self.showEnhancementCheckboxGroup.addButton(self.showOriginalPlusEnhancedButton, 1)
+        self.caseInfoFrameLayout.addWidget(self.showOriginalPlusEnhancedButton)
+
+        self.showJustEnhancedButton = qt.QRadioButton("Enhanced only")
+        self.showEnhancementCheckboxGroup.addButton(self.showJustEnhancedButton, 2)
+        self.caseInfoFrameLayout.addWidget(self.showJustEnhancedButton)
+
+
+
+        # Editor
+        row += 1
+        self.editorWidget = ui.CustomEditorWidget(self.parent)
+        self.editorWidget.setup()
+        self.editorCollapsibleButton = self.editorWidget.editLabelMapsFrame
+        self.editorCollapsibleButton.text = "Edit the current eye image"
+        self.editorCollapsibleButton.collapsed = False
+        # self.editorCollapsibleButton.visible = False
+        self.layout.addWidget(self.editorCollapsibleButton)
 
         # self.volumeSelector = slicer.qMRMLNodeComboBox()
         # self.volumeSelector.nodeTypes = ( "vtkMRMLVectorVolumeNode", "" )
@@ -71,21 +117,18 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         # self.mainAreaLayout.addWidget(self.volumeSelector, row, 1)
 
         # Select labelmap
-        row += 1
-        self.loadReportButton = ctk.ctkPushButton()
-        self.loadReportButton.text = "Load previous report"
-        self.loadReportButton.toolTip = "Load the previous annotations and colored areas for this case"
-        self.loadReportButton.enabled = False
-        # self.exampleButton.setIcon(qt.QIcon("{0}/Reload.png".format(SlicerUtil.CIP_ICON_DIR)))
-        # self.exampleButton.setIconSize(qt.QSize(20,20))
-        # self.exampleButton.setStyleSheet("font-weight:bold; font-size:12px" )
-        # self.exampleButton.setFixedWidth(200)
-        self.mainAreaLayout.addWidget(self.loadReportButton, row, 0)
+        # row += 1
+        # self.loadReportButton = ctk.ctkPushButton()
+        # self.loadReportButton.text = "Load previous report"
+        # self.loadReportButton.toolTip = "Load the previous annotations and colored areas for this case"
+        # self.loadReportButton.enabled = False
+        # # self.exampleButton.setIcon(qt.QIcon("{0}/Reload.png".format(SlicerUtil.CIP_ICON_DIR)))
+        # # self.exampleButton.setIconSize(qt.QSize(20,20))
+        # # self.exampleButton.setStyleSheet("font-weight:bold; font-size:12px" )
+        # # self.exampleButton.setFixedWidth(200)
+        # self.mainAreaLayout.addWidget(self.loadReportButton, row, 0)
 
-        # Report
-        row += 1
-        self.reportText = qt.QTextEdit()
-        self.mainAreaLayout.addWidget(self.reportText, row, 0)
+
 
         # self.labelmapSelector = slicer.qMRMLNodeComboBox()
         # self.labelmapSelector.nodeTypes = ( "vtkMRMLLabelMapVolumeNode", "" )
@@ -100,58 +143,86 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         # self.labelmapSelector.enabled = False
         # self.mainAreaLayout.addWidget(self.labelmapSelector, row, 1)
 
-        # Enhancement. TODO: replace with a radio button to allow quick display of just original and just enhanced
-        row += 1
-        self.showEnhancementCheckboxGroup = qt.QButtonGroup()
-        self.showJustOriginalButton = qt.QRadioButton("Original only")
-        self.showJustOriginalButton.setChecked(True)
-        self.showEnhancementCheckboxGroup.addButton(self.showJustOriginalButton, 0)
-        self.mainAreaLayout.addWidget(self.showJustOriginalButton, row, 0)
+        self.diagnosisCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.diagnosisCollapsibleButton.text = "Diagnosis"
+        self.diagnosisCollapsibleButton.collapsed = False
+        self.layout.addWidget(self.diagnosisCollapsibleButton)
+        self.diagnosisAreaLayout = qt.QVBoxLayout(self.diagnosisCollapsibleButton)
 
-        row += 1
-        self.showOriginalPlusEnhancedButton = qt.QRadioButton("Original and enhanced")
-        self.showEnhancementCheckboxGroup.addButton(self.showOriginalPlusEnhancedButton, 1)
-        self.mainAreaLayout.addWidget(self.showOriginalPlusEnhancedButton, row, 0)
+        # Problems detected
+        # row += 1
+        label = qt.QLabel("Problems detected: ")
+        label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
+        self.diagnosisAreaLayout.addWidget(label)
 
-        row += 1
-        self.showJustEnhancedButton = qt.QRadioButton("Enhanced only")
-        self.showEnhancementCheckboxGroup.addButton(self.showJustEnhancedButton, 2)
-        self.mainAreaLayout.addWidget(self.showJustEnhancedButton, row, 0)
+        # row += 1
+        self.problemsFrame = qt.QFrame()
+        self.problemsFrame.setFrameStyle(0x0002 | 0x0010)
+        self.problemsFrame.lineWidth = 2
+        self.problemsFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
+        self.diagnosisAreaLayout.addWidget(self.problemsFrame)
 
-        #
-        #
-        # self.showEnhancementCheckbox = qt.QCheckBox()
-        # self.showEnhancementCheckbox.setText("Show enhancement")
-        # self.showEnhancementCheckbox.setEnabled(False)
-        # self.mainAreaLayout.addWidget(self.showEnhancementCheckbox, row, 0)
+        self.problemsFrameLayout = qt.QGridLayout()
+        self.problemsFrame.setLayout(self.problemsFrameLayout)
 
+        self.redLesionsCheckbox = qt.QCheckBox()
+        self.redLesionsCheckbox.setText("Red lesions")
+        self.problemsFrameLayout.addWidget(self.redLesionsCheckbox, 0, 0)
+
+        self.exudatesCheckbox = qt.QCheckBox()
+        self.exudatesCheckbox.setText("Exudates")
+        self.problemsFrameLayout.addWidget(self.exudatesCheckbox, 0, 1)
+
+        self.microaneurysmsCheckbox = qt.QCheckBox()
+        self.microaneurysmsCheckbox.setText("Microaneurysms")
+        self.problemsFrameLayout.addWidget(self.microaneurysmsCheckbox, 0, 2)
+
+        label = qt.QLabel("Diabetic retinopathy diagnosis: ")
+        label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
+        self.diagnosisAreaLayout.addWidget(label)
+
+        # Diagnosis
+        self.diagnosisFrame = qt.QFrame()
+        self.diagnosisFrame.setFrameStyle(0x0002 | 0x0010)
+        self.diagnosisFrame.lineWidth = 2
+        self.diagnosisFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
+        self.diagnosisAreaLayout.addWidget(self.diagnosisFrame)
+
+        self.diagnosisFrameLayout = qt.QHBoxLayout()
+        self.diagnosisFrame.setLayout(self.diagnosisFrameLayout)
+
+        self.diagnosisRadioButtonGroup = qt.QButtonGroup()
+        for i in range(5):
+            rb = qt.QRadioButton(str(i))
+            self.diagnosisRadioButtonGroup.addButton(rb, i)
+            self.diagnosisFrameLayout.addWidget(rb)
+        self.diagnosisRadioButtonGroup.buttons()[0].setChecked(True)
+
+        # Additional comments
+        label = qt.QLabel("Additional comments:")
+        label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
+        self.diagnosisAreaLayout.addWidget(label)
         row += 1
+
+        self.reportText = qt.QTextEdit()
+        self.reportText.setStyleSheet("margin: 10px")
+        self.diagnosisAreaLayout.addWidget(self.reportText)
+
         self.printReportButton = ctk.ctkPushButton()
         self.printReportButton.text = "Print report"
-        self.mainAreaLayout.addWidget(self.printReportButton, row, 0)
+        self.diagnosisAreaLayout.addWidget(self.printReportButton)
 
-        # Reset button
-        row += 1
-        self.resetButton = ctk.ctkPushButton()
-        self.resetButton.text = "Close case"
-        self.resetButton.toolTip = "Close the current case"
-        self.mainAreaLayout.addWidget(self.resetButton, row, 0)
 
-        # Editor
-        row += 1
-        self.editorWidget = ui.CustomEditorWidget(self.parent)
-        self.editorWidget.setup()
-        self.editorCollapsibleButton = self.editorWidget.editLabelMapsFrame
-        self.editorCollapsibleButton.text = "Edit the current eye image"
-        self.editorCollapsibleButton.collapsed = False
-        self.editorCollapsibleButton.visible = False
+
+
+
 
 
         self.layout.addStretch(1)
 
         # Connections
-        self.loadImageButton.connect('clicked()', self.__onLoadImageClicked__)
-        self.loadReportButton.connect('clicked()', self.__onLoadReportClicked__)
+        self.loadCaseButton.connect('clicked()', self.__onLoadCaseClicked__)
+        # self.loadReportButton.connect('clicked()', self.__onLoadReportClicked__)
         self.printReportButton.connect('clicked()', self.__onPrintReportClicked__)
         self.showEnhancementCheckboxGroup.connect("buttonClicked (int)", self.__onEnhancementButtonGroupClicked__)
         self.resetButton.connect('clicked()', self.reset)
@@ -164,7 +235,8 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
             compNode.SetLabelOpacity(0.3)
 
     def refreshUI(self):
-        self.loadReportButton.enabled = self.logic.current2DVolume is not None
+        return
+        # self.loadReportButton.enabled = self.logic.current2DVolume is not None
         for button in self.showEnhancementCheckboxGroup.buttons():
             button.setEnabled(self.logic.current2DVolume is not None)
         
@@ -248,14 +320,20 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         """This is invoked as a destructor of the GUI when the module is no longer going to be used"""
         pass
 
-    def __onLoadImageClicked__(self):
+    def __onLoadCaseClicked__(self):
         """ Load a new eye fundus image
-        :return:
+        :return: True if an image was loaded
         """
-        f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
-        if f:
-            self.loadImage(f)
-
+        #f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
+        dir = qt.QFileDialog.getExistingDirectory()
+        if dir:
+            dirName = os.path.basename(dir)
+            for f in os.listdir(dir):
+                print f
+                if f.startswith(dirName + "."):
+                    self.loadImage(os.path.join(dir, f))
+                    return True
+        return False
 
     def __onLoadReportClicked__(self):
         f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
@@ -298,10 +376,10 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
             sliceNodeYellow.SetOrientationToAxial()
             # Assign the labelmap
             slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow').SetLabelVolumeID(self.logic.currentLabelmapVolume.GetID())
-            # Set the same field of view for the enhanced volume
-            fov = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetFieldOfView()
-            # We divide the first coordinate
-            sliceNodeYellow.SetFieldOfView(fov[0], fov[1], 1)
+            if buttonId == 1:
+                # Set the same field of view for the original and the enhanced volume
+                fov = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetFieldOfView()
+                sliceNodeYellow.SetFieldOfView(fov[0], fov[1], 1)
 
 
 #
