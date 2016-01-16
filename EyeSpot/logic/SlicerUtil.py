@@ -478,6 +478,59 @@ class SlicerUtil:
             compNode.SetForegroundVolumeID(volumeNodeId)
             compNode.SetForegroundOpacity(opacity)
 
+    @staticmethod
+    def snapshot(fullFileName, type=-1):
+        """ Save a png snapshot of the specified window
+        :param fullFileName: Full path name of the output file (ex: "/Data/output.png")
+        :param type: slicer.qMRMLScreenShotDialog.FullLayout, slicer.qMRMLScreenShotDialog.ThreeD,
+                    slicer.qMRMLScreenShotDialog.Red, slicer.qMRMLScreenShotDialog.Yellow, slicer.qMRMLScreenShotDialog.Green
+                    Default: main window
+        :return:
+        """
+        # show the message even if not taking a screen shot
+        lm = slicer.app.layoutManager()
+        # switch on the type to get the requested window
+        widget = 0
+        if type == slicer.qMRMLScreenShotDialog.FullLayout:
+            # full layout
+            widget = lm.viewport()
+        elif type == slicer.qMRMLScreenShotDialog.ThreeD:
+            # just the 3D window
+            widget = lm.threeDWidget(0).threeDView()
+        elif type == slicer.qMRMLScreenShotDialog.Red:
+            # red slice window
+            widget = lm.sliceWidget("Red")
+        elif type == slicer.qMRMLScreenShotDialog.Yellow:
+            # yellow slice window
+            widget = lm.sliceWidget("Yellow")
+        elif type == slicer.qMRMLScreenShotDialog.Green:
+            # green slice window
+            widget = lm.sliceWidget("Green")
+        else:
+            # default to using the full window
+            widget = slicer.util.mainWindow()
+            # reset the type so that the node is set correctly
+            #type = slicer.qMRMLScreenShotDialog.FullLayout
+
+        # grab and convert to vtk image data
+        qpixMap = qt.QPixmap().grabWidget(widget)
+        # Save as a png file
+        qpixMap.save(fullFileName)
+        # qimage = qpixMap.toImage()
+        # imageData = vtk.vtkImageData()
+        # slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
+        #
+        # annotationLogic = slicer.modules.annotations.logic()
+        # annotationLogic.CreateSnapShot(name, "", type, factor, imageData)
+        #
+        # snapshotNode = slicer.util.getNode(name)
+        # pngWriter = vtk.vtkPNGWriter()
+        # snapShotImage = snapshotNode.GetScreenShot()
+        # pngWriter.SetInputData(snapShotImage)
+        # filePath = "{0}/{1}.png".format(self.localStoragePath, snapshotName)
+        # pngWriter.SetFileName(filePath)
+        # pngWriter.Write()
+
         # @staticmethod
     # def gitUpdateCIP():
     #     if Util.AUTO_UPDATE_DISABLED:
