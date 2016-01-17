@@ -339,4 +339,18 @@ class Util:
         mean = np.mean(np.where(numpyArray == labelId), axis=1)
         return np.asarray(np.round(mean, 0), np.int)
 
-
+    @staticmethod
+    def openFile(filePath):
+        """ Open a file with the default system application
+        :param filePath: file to open
+        """
+        if os.sys.platform == "darwin":
+            # MAC
+            os.system('open ' + filePath)
+        elif os.sys.platform == "win32":
+            # Windows
+            os.system('start ' + filePath)
+        else:
+            # Linux
+            import subprocess
+            subprocess.call(["xdg-open", filePath])

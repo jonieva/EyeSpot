@@ -485,7 +485,7 @@ class SlicerUtil:
         :param type: slicer.qMRMLScreenShotDialog.FullLayout, slicer.qMRMLScreenShotDialog.ThreeD,
                     slicer.qMRMLScreenShotDialog.Red, slicer.qMRMLScreenShotDialog.Yellow, slicer.qMRMLScreenShotDialog.Green
                     Default: main window
-        :return:
+        :return: full path of the snapshot
         """
         # show the message even if not taking a screen shot
         lm = slicer.app.layoutManager()
@@ -516,6 +516,8 @@ class SlicerUtil:
         qpixMap = qt.QPixmap().grabWidget(widget)
         # Save as a png file
         qpixMap.save(fullFileName)
+
+        return fullFileName
         # qimage = qpixMap.toImage()
         # imageData = vtk.vtkImageData()
         # slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)

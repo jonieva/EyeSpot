@@ -6,7 +6,7 @@ from slicer.ScriptedLoadableModule import *
 import logging
 import json
 import ui
-from logic import *
+from logic import SlicerUtil, Util
 #
 # EyeSpot
 #
@@ -106,48 +106,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.editorCollapsibleButton.text = "Edit the current eye image"
         self.editorCollapsibleButton.collapsed = False
         self.editorWidget.toolsColor.terminologyCollapsibleButton.setVisible(False)
-        # self.editorCollapsibleButton.visible = False
         self.layout.addWidget(self.editorCollapsibleButton)
-
-        # self.volumeSelector = slicer.qMRMLNodeComboBox()
-        # self.volumeSelector.nodeTypes = ( "vtkMRMLVectorVolumeNode", "" )
-        # self.volumeSelector.selectNodeUponCreation = False
-        # self.volumeSelector.addEnabled = False
-        # self.volumeSelector.noneEnabled = False
-        # self.volumeSelector.removeEnabled = False
-        # self.volumeSelector.showHidden = False
-        # self.volumeSelector.showChildNodeTypes = False
-        # self.volumeSelector.setMRMLScene( slicer.mrmlScene )
-        # self.volumeSelector.setToolTip( "Pick the image to edit" )
-        # self.volumeSelector.enabled = False
-        # self.mainAreaLayout.addWidget(self.volumeSelector, row, 1)
-
-        # Select labelmap
-        # row += 1
-        # self.loadReportButton = ctk.ctkPushButton()
-        # self.loadReportButton.text = "Load previous report"
-        # self.loadReportButton.toolTip = "Load the previous annotations and colored areas for this case"
-        # self.loadReportButton.enabled = False
-        # # self.exampleButton.setIcon(qt.QIcon("{0}/Reload.png".format(SlicerUtil.CIP_ICON_DIR)))
-        # # self.exampleButton.setIconSize(qt.QSize(20,20))
-        # # self.exampleButton.setStyleSheet("font-weight:bold; font-size:12px" )
-        # # self.exampleButton.setFixedWidth(200)
-        # self.mainAreaLayout.addWidget(self.loadReportButton, row, 0)
-
-
-
-        # self.labelmapSelector = slicer.qMRMLNodeComboBox()
-        # self.labelmapSelector.nodeTypes = ( "vtkMRMLLabelMapVolumeNode", "" )
-        # self.labelmapSelector.selectNodeUponCreation = False
-        # self.labelmapSelector.addEnabled = False
-        # self.labelmapSelector.noneEnabled = False
-        # self.labelmapSelector.removeEnabled = False
-        # self.labelmapSelector.showHidden = False
-        # self.labelmapSelector.showChildNodeTypes = False
-        # self.labelmapSelector.setMRMLScene( slicer.mrmlScene )
-        # self.labelmapSelector.setToolTip( "Pick the image to edit" )
-        # self.labelmapSelector.enabled = False
-        # self.mainAreaLayout.addWidget(self.labelmapSelector, row, 1)
 
         self.diagnosisCollapsibleButton = ctk.ctkCollapsibleButton()
         self.diagnosisCollapsibleButton.text = "Diagnosis"
@@ -385,16 +344,16 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
                     return True
         return False
 
-    def __onLoadReportClicked__(self):
-        f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
-        if f:
-            (loaded, volume) = slicer.util.loadLabelVolume(f, returnNode=True)
-            if loaded:
-                selectionNode = slicer.app.applicationLogic().GetSelectionNode()
-                self.volumeSelector.setCurrentNode(volume)
-                selectionNode.SetReferenceActiveLabelVolumeID(volume.GetID())
-                slicer.app.applicationLogic().PropagateVolumeSelection(0)
-                self.currentLabelmapPath = f
+    # def __onLoadReportClicked__(self):
+    #     f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
+    #     if f:
+    #         (loaded, volume) = slicer.util.loadLabelVolume(f, returnNode=True)
+    #         if loaded:
+    #             selectionNode = slicer.app.applicationLogic().GetSelectionNode()
+    #             self.volumeSelector.setCurrentNode(volume)
+    #             selectionNode.SetReferenceActiveLabelVolumeID(volume.GetID())
+    #             slicer.app.applicationLogic().PropagateVolumeSelection(0)
+    #             self.currentLabelmapPath = f
 
 
 
@@ -412,7 +371,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
             'The report was generated successfully. Do you want to open it now?',
             qt.QMessageBox.Yes|qt.QMessageBox.No) == qt.QMessageBox.Yes:
             # Open the file
-            os.system(reportFile)
+            Util.openFile()
 
 
     # def __onshowEnhancementCheckboxStateChanged__(self, state):
@@ -467,7 +426,6 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         self.current2DVectorVolume = None
         self.currentScalarVolume = None
         self.currentLabelmapVolume = None
-        self.currentAnnotationsPath = None
         self.currentEnhancedVolume = None
 
         p = self.getResourcePath("EyeSpot_Colors.ctbl")
@@ -548,29 +506,36 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         return os.path.join(os.path.dirname(os.path.realpath(__file__)), "Resources", fileName)
 
     def saveReport(self, currentValuesDict):
-        """ Save a JSON text file with the current values of the GUI stored in a dictionary
+        """ Save a JSON text file with the current values of the GUI stored in a dictionary.
+        It also saves the current enhanced and labelmap volumes
         :param currentValuesDict: dictionary of values
         :return: file where the report was stored
         """
         p = os.path.join(self.getCurrentDataFolder(), "report.json")
         with open(p, "w+b") as f:
             json.dump(currentValuesDict, f)
+
+        # Save the labelmap
+        if self.currentLabelmapVolume.GetStorageNode() is None:
+            SlicerUtil.saveNewNode(self.currentLabelmapVolume,
+                    os.path.join(self.getCurrentDataFolder(), self.currentLabelmapVolume.GetName() + ".nrrd"))
+        else:
+            self.currentLabelmapVolume.GetStorageNode().WriteData(self.currentLabelmapVolume)
+        # Save a png file of the labelmap. We manipulate the widget to have the aspect that we want for the screenshot
+        lm = slicer.app.layoutManager()
+        SlicerUtil.changeLayout(6)
+        controller = lm.sliceWidget("Red").sliceController()
+        controller.fitSliceToBackground()
+        # Hide the slider bar (just show the picture)
+        controller.hide()
+        # Take the snapshot
+        SlicerUtil.snapshot(os.path.join(self.getCurrentDataFolder(), self.currentLabelmapVolume.GetName() + ".png"), slicer.qMRMLScreenShotDialog.Red)
+        # Restore the regular controller
+        controller.show()
+        # TODO: save the enhanced volume
         return p
 
-    def openFile(self, filePath):
-        """ Open a file with the default system application
-        :param filePath: file to open
-        """
-        if os.sys.platform == "darwin":
-            # MAC
-            os.system('open ' + filePath)
-        elif os.sys.platform == "win32":
-            # Windows
-            os.system('start ' + filePath)
-        else:
-            # Linux
-            import subprocess
-            subprocess.call(["xdg-open", filePath])
+
 
     def printReport(self, currentValuesDict, callback):
         """ Generate a html report file and print it
@@ -627,14 +592,16 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         html = html.replace("@@MICROANEURYSMS@@", "YES" if currentValuesDict["Microaneurysms"] else "NO")
         html = html.replace("@@ADDITIONAL_COMMENTS@@", self.__toHtml__(currentValuesDict["AdditionalComments"]))
         html = html.replace("@@IMAGE_ORIGINAL@@", self.current2DVectorVolume.GetStorageNode().GetFileName())
-        html = html.replace("@@IMAGE_ANNOTATED@@", self.current2DVectorVolume.GetStorageNode().GetFileName())
+        html = html.replace("@@IMAGE_ANNOTATED@@", self.currentLabelmapVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
         html = html.replace("@@IMAGE_ENHANCED@@", self.current2DVectorVolume.GetStorageNode().GetFileName())
 
         return html
 
-
-
     def __toHtml__(self, text):
+        """ Encode a plain text in html
+        :param text:
+        :return:
+        """
         text = text.encode('ascii', 'xmlcharrefreplace')
         text = text.replace("\n", "<br/>")
         return text
@@ -670,49 +637,3 @@ class EyeSpotTest(ScriptedLoadableModuleTest):
         logging.info("The response message was: " + responseMessage)
         self.assertTrue(responseMessage == expectedMessage)
         self.delayDisplay('Test passed!')
-
-# import re
-# s='''
-# <html>
-# <head>
-# <meta content="text/html; charset=ISO-8859-1"
-# http-equiv="content-type">
-# <title>EyeSpot</title>
-# <style type="text/css">
-# #divDescription {
-# margin-bottom: 15px;
-# margin-top: 15px;
-# }
-#
-# </style>
-# </head>
-# <body>
-# <big style="font-weight: bold;">EyeSpot Report</big><br>
-# <div id="divDescription">
-# (Description)
-# </div>
-# <img id="img1" style="width: 400px;" alt="eye_fundus"
-# src="file:///Data/jonieva/OneDrive/EyeSpot/diaretdb1_v_1_1/resources/images/ddb1_fundusimages/image001.png"><br>
-# <br>
-# </body>
-# </html>
-# '''
-#
-#
-# repl = '''<div id="divDescription">
-# (Description)
-# </div>'''
-# myText = '''
-# <div id="divDescription">
-# New description
-# </div>
-# '''
-# s.replace(repl, myText)
-#
-#
-#
-# expr = ".*<div id=\"divDescription\">(?P<descr>.*)</div>"
-# m = re.match(expr, s, re.DOTALL)
-# repl = "\g<descr>my description"
-# re.sub(expr, repl, s, flags=re.DOTALL)
-# m.group(1)
