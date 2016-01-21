@@ -479,7 +479,7 @@ class SlicerUtil:
             compNode.SetForegroundOpacity(opacity)
 
     @staticmethod
-    def snapshot(fullFileName, type=-1):
+    def takeSnapshot(fullFileName, type=-1):
         """ Save a png snapshot of the specified window
         :param fullFileName: Full path name of the output file (ex: "/Data/output.png")
         :param type: slicer.qMRMLScreenShotDialog.FullLayout, slicer.qMRMLScreenShotDialog.ThreeD,
@@ -518,20 +518,14 @@ class SlicerUtil:
         qpixMap.save(fullFileName)
 
         return fullFileName
-        # qimage = qpixMap.toImage()
-        # imageData = vtk.vtkImageData()
-        # slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
-        #
-        # annotationLogic = slicer.modules.annotations.logic()
-        # annotationLogic.CreateSnapShot(name, "", type, factor, imageData)
-        #
-        # snapshotNode = slicer.util.getNode(name)
-        # pngWriter = vtk.vtkPNGWriter()
-        # snapShotImage = snapshotNode.GetScreenShot()
-        # pngWriter.SetInputData(snapShotImage)
-        # filePath = "{0}/{1}.png".format(self.localStoragePath, snapshotName)
-        # pngWriter.SetFileName(filePath)
-        # pngWriter.Write()
+
+    @staticmethod
+    def showToolbars(show):
+        """ Show/hide all the superior toolbars in the Slicer GUI
+        @param show:
+        """
+        for toolbar in slicer.util.mainWindow().findChildren('QToolBar'):
+          toolbar.setVisible(show)
 
         # @staticmethod
     # def gitUpdateCIP():

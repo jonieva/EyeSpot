@@ -129,22 +129,22 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
         self.problemsFrameLayout = qt.QGridLayout()
         self.problemsFrame.setLayout(self.problemsFrameLayout)
-        self.problemsButtonGroup = qt.QButtonGroup()
+        self.problemsButtons = []
 
         self.redLesionsCheckbox = qt.QCheckBox()
         self.redLesionsCheckbox.setText("Red lesions")
         self.problemsFrameLayout.addWidget(self.redLesionsCheckbox, 0, 0)
-        self.problemsButtonGroup.addButton(self.redLesionsCheckbox)
+        self.problemsButtons.append(self.redLesionsCheckbox)
 
         self.exudatesCheckbox = qt.QCheckBox()
         self.exudatesCheckbox.setText("Exudates")
         self.problemsFrameLayout.addWidget(self.exudatesCheckbox, 0, 1)
-        self.problemsButtonGroup.addButton(self.exudatesCheckbox)
+        self.problemsButtons.append(self.exudatesCheckbox)
 
         self.microaneurysmsCheckbox = qt.QCheckBox()
         self.microaneurysmsCheckbox.setText("Microaneurysms")
         self.problemsFrameLayout.addWidget(self.microaneurysmsCheckbox, 0, 2)
-        self.problemsButtonGroup.addButton(self.microaneurysmsCheckbox)
+        self.problemsButtons.append(self.microaneurysmsCheckbox)
 
         label = qt.QLabel("Diabetic retinopathy diagnosis: ")
         label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
@@ -182,7 +182,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.diagnosisAreaLayout.addWidget(self.saveReportButton)
 
         self.printReportButton = ctk.ctkPushButton()
-        self.printReportButton.text = "Print report"
+        self.printReportButton.text = "Save and generate PDF"
         self.diagnosisAreaLayout.addWidget(self.printReportButton)
 
 
@@ -196,13 +196,10 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.saveReportButton.connect('clicked()', self.__onSaveReportClicked__)
         self.printReportButton.connect('clicked()', self.__onPrintReportClicked__)
         self.resetButton.connect('clicked()', self.reset)
+        slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.EndCloseEvent, self.__onSceneClosed__)
 
         # Set default layout Red
         SlicerUtil.changeLayout(6)
-        compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
-        for compNode in compNodes.itervalues():
-            compNode.SetLinkedControl(True)
-            compNode.SetLabelOpacity(0.3)
 
         self.refreshUI()
 
@@ -211,6 +208,14 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         return self.logic.current2DVectorVolume is not None
 
     def refreshUI(self):
+        # Link windows
+        compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
+        for compNode in compNodes.itervalues():
+            compNode.SetLinkedControl(True)
+            # compNode.SetLabelOpacity(0.3)
+
+        self.__setLabelmapOutlines__()
+
         self.resetButton.setVisible(self.isCaseLoaded)
         self.caseInfoFrame.setVisible(self.isCaseLoaded)
         self.editorCollapsibleButton.setVisible(self.isCaseLoaded)
@@ -247,32 +252,6 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
             selectionNode.SetReferenceActiveLabelVolumeID(labelmapId)
         slicer.app.applicationLogic().PropagateVolumeSelection(0)
 
-    def loadImage(self, filePath):
-        """ Load a new eye image and create a labelmap for it.
-        It also sets the images as the active ones in the scene
-        :param filePath: file path for the image
-        :return: True if the image and the labelmap have been sucessfully created
-        """
-        properties = {}
-        properties['singleFile'] = True
-        (loaded, volume) = slicer.util.loadVolume(filePath, properties, returnNode=True)
-        if loaded:
-            self.logic.current2DVectorVolume = volume
-            self.logic.currentCaseDir = os.path.dirname(filePath)
-            # Convert the 2D image in a scalar node
-            self.logic.currentScalarVolume = self.logic.getScalarNodeFrom2DNode(volume)
-            # set the scalar node as the active in the selector
-            # self.volumeSelector.setCurrentNode(volume)
-            # Create an empty labelmap volume
-            nodeName = self.logic.current2DVectorVolume.GetName() + "_label"
-            self.logic.currentLabelmapVolume = self.logic.createNewLabelmap(self.logic.currentScalarVolume, nodeName)
-            # Active the labelmap in the scene (but not the scalar node because we don't want a grayscale image in the scene
-            self.setActiveVolumeId(None, self.logic.currentLabelmapVolume.GetID())
-            # Set a default text for the report
-            #self.insertDefaultReportText()
-
-        self.refreshUI()
-        return loaded
 
     def insertDefaultReportText(self):
         cursor = qt.QTextCursor(self.additionalCommentsText.document())
@@ -283,12 +262,12 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         cursor.insertHtml(s.decode("utf-8"))
 
     def getCurrentReportData(self):
-        """ Get a dictionary with the current information of the UI
-        :return:
+        """ Get a dictionary with the current information of the GUI
+        :return: dictionary with the content
         """
         report = {}
         # Problems checked
-        for button in self.problemsButtonGroup.buttons():
+        for button in self.problemsButtons:
             report[button.text] = button.isChecked()
 
         # Diabetic Retinopathy Score
@@ -299,17 +278,32 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
         return report
 
-    def reset(self):
-        slicer.mrmlScene.Clear(0)
+    def loadGUIFromReportData(self, data):
+        """ Load the GUI values from a dictionary that contains the report data
+        :param data: dictionary of data
+        """
+        for button in self.problemsButtons:
+            button.setChecked(data[button.text])
+
+        score = str(data["DiabeticRetinopathyScore"])
+        for button in self.diagnosisRadioButtonGroup.buttons():
+            if button.text == score:
+                button.setChecked(True)
+                break
+        self.additionalCommentsText.plainText = data["AdditionalComments"]
+
+    def reset(self, closeScene=True):
+        if closeScene:
+            slicer.mrmlScene.Clear(0)
         self.showEnhancementCheckboxGroup.buttons()[0].setChecked(True)
         self.__initVars__()
         self.refreshUI()
 
 
-
     def enter(self):
         """This is invoked every time that we select this module as the active module in Slicer (not only the first time)"""
         self.__setLabelmapOutlines__()
+        SlicerUtil.showToolbars(SlicerUtil.IsDevelopment)
 
     def exit(self):
         """This is invoked every time that we switch to another module (not only when Slicer is closed)."""
@@ -334,60 +328,32 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         """ Load a new eye fundus image
         :return: True if an image was loaded
         """
-        #f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
         dir = qt.QFileDialog.getExistingDirectory()
         if dir:
-            dirName = os.path.basename(dir)
-            for f in os.listdir(dir):
-                if f == dirName + ".png":
-                    self.loadImage(os.path.join(dir, f))
-                    return True
-        return False
-
-    # def __onLoadReportClicked__(self):
-    #     f = qt.QFileDialog.getOpenFileName(slicer.util.mainWindow())
-    #     if f:
-    #         (loaded, volume) = slicer.util.loadLabelVolume(f, returnNode=True)
-    #         if loaded:
-    #             selectionNode = slicer.app.applicationLogic().GetSelectionNode()
-    #             self.volumeSelector.setCurrentNode(volume)
-    #             selectionNode.SetReferenceActiveLabelVolumeID(volume.GetID())
-    #             slicer.app.applicationLogic().PropagateVolumeSelection(0)
-    #             self.currentLabelmapPath = f
-
-
+            # Close any opened case
+            self.reset()
+            if self.logic.loadCase(dir):
+                self.setActiveVolumeId(self.logic.current2DVectorVolume.GetID(), self.logic.currentLabelmapVolume.GetID())
+                if self.logic.currentReportData is not None:
+                    self.loadGUIFromReportData(self.logic.currentReportData)
+        self.refreshUI()
 
     def __onSaveReportClicked__(self):
         reportPath = self.logic.saveReport(self.getCurrentReportData())
         qt.QMessageBox.information(slicer.util.mainWindow(), 'Report saved',
-                'The report was successfully saved in ' + reportPath)
-
+                'The report was saved successfully')
+        self.refreshUI()
 
     def __onPrintReportClicked__(self):
-       self.logic.printReport(self.getCurrentReportData(), self.__printReportCallback__)
+        self.logic.printReport(self.getCurrentReportData(), self.__printReportCallback__)
 
     def __printReportCallback__(self, reportFile):
         if qt.QMessageBox.question(slicer.util.mainWindow(), 'Report printed',
-            'The report was generated successfully. Do you want to open it now?',
-            qt.QMessageBox.Yes|qt.QMessageBox.No) == qt.QMessageBox.Yes:
-            # Open the file
-            Util.openFile()
-
-
-    # def __onshowEnhancementCheckboxStateChanged__(self, state):
-    #     # Get the enhanced volume
-    #     enhancedVol = self.logic.getEnhancedVolume()
-    #     # Assign it to the yellow slice
-    #     slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow').SetBackgroundVolumeID(enhancedVol.GetID())
-    #     slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow').SetOrientationToAxial()
-    #
-    #     # Link all the controls
-    #     compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
-    #     for compNode in compNodes.itervalues():
-    #         compNode.SetLinkedControl(True)
-    #     SlicerUtil.centerAllVolumes()
-    #     SlicerUtil.refreshActiveWindows()
-    #     self.refreshUI()
+                'The PDF was generated successfully. Do you want to open it now?',
+                qt.QMessageBox.Yes|qt.QMessageBox.No) == qt.QMessageBox.Yes:
+            # Open the pdf file
+            Util.openFile(reportFile)
+        self.refreshUI()
 
     def __onEnhancementButtonGroupClicked__(self, buttonId):
         self.refreshUI()
@@ -406,7 +372,8 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
                 fov = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetFieldOfView()
                 sliceNodeYellow.SetFieldOfView(fov[0], fov[1], 1)
 
-
+    def __onSceneClosed__(self, arg1, arg2):
+        self.reset(False)
 #
 # EyeSpotLogic
 #
@@ -423,13 +390,66 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         """Constructor. """
         ScriptedLoadableModuleLogic.__init__(self)
 
-        self.current2DVectorVolume = None
-        self.currentScalarVolume = None
-        self.currentLabelmapVolume = None
-        self.currentEnhancedVolume = None
+        self.current2DVectorVolume = None       # Original 2D image
+        self.currentScalarVolume = None         # 3D volume to represent the original image
+        self.currentLabelmapVolume = None       # Labelmap
+        self.currentEnhancedVolume = None       # Enhanced 3D volume
+        self.currentReportData = None           # Dictionary for the report data (lesions, comments, etc.)
 
+        # Customized colors for the labelmap
         p = self.getResourcePath("EyeSpot_Colors.ctbl")
         self.colorTableNode = slicer.modules.colors.logic().LoadColorFile(p)
+
+        self.isCurrentReportSaved = False         # Current report has been saved
+
+    def loadCase(self, directory):
+        """ Load a new eye image and create a labelmap for it.
+        It also sets the images as the active ones in the scene
+        :param filePath: directory where all the images/data are stored
+        :return: True if the image and has been successfully loaded
+        """
+        properties = {}
+        properties['singleFile'] = True
+        dirName = os.path.basename(os.path.normpath(directory))
+        for f in os.listdir(directory):
+            if f == dirName + ".png":
+                # Load the main image
+                p = os.path.join(directory, f)
+                (loaded, volume) = slicer.util.loadVolume(p, properties, returnNode=True)
+                if loaded:
+                    self.current2DVectorVolume = volume
+                    # Make sure that the volume is named as the directory to avoid wrong names
+                    self.current2DVectorVolume.SetName(dirName)
+                    self.currentCaseDir = directory
+                    # Convert the 2D image in a scalar node
+                    self.currentScalarVolume = self.getScalarNodeFrom2DNode(volume)
+            elif f == dirName + "_label.nrrd":
+                # Load a previously existing labelmap
+                p = os.path.join(directory, f)
+                (loaded, volume) = slicer.util.loadLabelVolume(p, returnNode=True)
+                if loaded:
+                    self.currentLabelmapVolume = volume
+            elif f == dirName + "_enh.nrrd":
+                # Load a previously existing enhanced volume
+                p = os.path.join(directory, f)
+                (loaded, volume) = slicer.util.loadVolume(p, returnNode=True)
+                if loaded:
+                    self.currentEnhancedVolume = volume
+            elif f == "report.json":
+                p = os.path.join(directory, f)
+                with open(p) as f:
+                    self.currentReportData = json.load(f)
+
+        # If the labelmap didn't exist, create a new one
+        if self.currentLabelmapVolume is None:
+            nodeName = self.current2DVectorVolume.GetName() + "_label"
+            self.currentLabelmapVolume = self.createNewLabelmap(self.currentScalarVolume, nodeName)
+
+        # Use our customized colors
+        displayNode = self.currentLabelmapVolume.GetDisplayNode()
+        displayNode.SetAndObserveColorNodeID(self.colorTableNode.GetID())
+
+        return self.currentScalarVolume is not None
 
     def getCurrentDataFolder(self):
         """ Get the folder where the original image was loaded from, where we will store all the related information
@@ -468,9 +488,6 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         node = logic.CreateAndAddLabelVolume(scalarNode, nodeName)
         # Make sure that the node name is correct, because sometimes the scene adds a suffix
         node.SetName(nodeName)
-        # Use our customized colors
-        displayNode = node.GetDisplayNode()
-        displayNode.SetAndObserveColorNodeID(self.colorTableNode.GetID())
         return node
 
     def getEnhancedVolume(self):
@@ -521,7 +538,21 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
                     os.path.join(self.getCurrentDataFolder(), self.currentLabelmapVolume.GetName() + ".nrrd"))
         else:
             self.currentLabelmapVolume.GetStorageNode().WriteData(self.currentLabelmapVolume)
-        # Save a png file of the labelmap. We manipulate the widget to have the aspect that we want for the screenshot
+
+        # Save the enhanced volume
+        if self.currentEnhancedVolume.GetStorageNode() is None:
+            SlicerUtil.saveNewNode(self.currentEnhancedVolume,
+                    os.path.join(self.getCurrentDataFolder(), self.currentEnhancedVolume.GetName() + ".nrrd"))
+        else:
+            self.currentEnhancedVolume.GetStorageNode().WriteData(self.currentEnhancedVolume)
+
+        self.isCurrentReportSaved = True
+        return p
+
+    def __printSnapshots__(self):
+        """ Generate snapshots of all the volumes
+        """
+        # Save a png file from the labelmap. We manipulate the widget to have the aspect that we want for the screenshot
         lm = slicer.app.layoutManager()
         SlicerUtil.changeLayout(6)
         controller = lm.sliceWidget("Red").sliceController()
@@ -529,19 +560,37 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         # Hide the slider bar (just show the picture)
         controller.hide()
         # Take the snapshot
-        SlicerUtil.snapshot(os.path.join(self.getCurrentDataFolder(), self.currentLabelmapVolume.GetName() + ".png"), slicer.qMRMLScreenShotDialog.Red)
+        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.currentLabelmapVolume.GetName() + ".png"),
+                                slicer.qMRMLScreenShotDialog.Red)
         # Restore the regular controller
         controller.show()
-        # TODO: save the enhanced volume
-        return p
 
-
+        # Save a png file from the enhanced volume. We manipulate the widget to have the aspect that we want for the screenshot
+        lm = slicer.app.layoutManager()
+        SlicerUtil.changeLayout(7)
+        controller = lm.sliceWidget("Yellow").sliceController()
+        controller.fitSliceToBackground()
+        # Hide the slider bar (just show the picture)
+        controller.hide()
+        # Take the snapshot
+        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.currentEnhancedVolume.GetName() + ".png"),
+                                slicer.qMRMLScreenShotDialog.Yellow)
+        # Restore the regular controller
+        controller.show()
 
     def printReport(self, currentValuesDict, callback):
         """ Generate a html report file and print it
         :param currentValuesDict: dictionary of GUI values
         """
+        if not self.isCurrentReportSaved:
+            # Save the report first
+            self.saveReport(currentValuesDict)
+
+        # Generate the snapshots of the images
+        self.__printSnapshots__()
+
         self.callback = callback
+        # Generate the html code
         html = self.__generateHtml__(currentValuesDict)
 
         # Write the html to a temp file
@@ -580,10 +629,6 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         with open(templatePath, "r+b") as f:
             html = f.read()
 
-        # Replace the description
-        #expr = ".*<div id=\"divDescription\">(.*)</div>"
-        #m = re.match(expr, s, re.DOTALL)
-
         # myText = '''<div id="divDescription">{0}</div>'''.format(self.__toHtml__(reportText))
         html = html.replace("@@RESOURCES_FOLDER@@", self.getResourcePath())
         html = html.replace("@@DIABETIC_RETINOPATHY_SCORE@@", str(currentValuesDict["DiabeticRetinopathyScore"]))
@@ -593,7 +638,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         html = html.replace("@@ADDITIONAL_COMMENTS@@", self.__toHtml__(currentValuesDict["AdditionalComments"]))
         html = html.replace("@@IMAGE_ORIGINAL@@", self.current2DVectorVolume.GetStorageNode().GetFileName())
         html = html.replace("@@IMAGE_ANNOTATED@@", self.currentLabelmapVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
-        html = html.replace("@@IMAGE_ENHANCED@@", self.current2DVectorVolume.GetStorageNode().GetFileName())
+        html = html.replace("@@IMAGE_ENHANCED@@", self.currentEnhancedVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
 
         return html
 
