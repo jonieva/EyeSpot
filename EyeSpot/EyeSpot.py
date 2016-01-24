@@ -131,20 +131,30 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.problemsFrame.setLayout(self.problemsFrameLayout)
         self.problemsButtons = []
 
-        self.redLesionsCheckbox = qt.QCheckBox()
-        self.redLesionsCheckbox.setText("Red lesions")
-        self.problemsFrameLayout.addWidget(self.redLesionsCheckbox, 0, 0)
-        self.problemsButtons.append(self.redLesionsCheckbox)
+        self.microaneurysmsCheckbox = qt.QCheckBox()
+        self.microaneurysmsCheckbox.setText("Microaneurysms")
+        self.problemsFrameLayout.addWidget(self.microaneurysmsCheckbox, 0, 0)
+        self.problemsButtons.append(self.microaneurysmsCheckbox)
 
         self.exudatesCheckbox = qt.QCheckBox()
         self.exudatesCheckbox.setText("Exudates")
         self.problemsFrameLayout.addWidget(self.exudatesCheckbox, 0, 1)
         self.problemsButtons.append(self.exudatesCheckbox)
+        
+        self.haemorrhagesCheckbox = qt.QCheckBox()
+        self.haemorrhagesCheckbox.setText("Haemorrhages")
+        self.problemsFrameLayout.addWidget(self.haemorrhagesCheckbox, 0, 2)
+        self.problemsButtons.append(self.haemorrhagesCheckbox)
 
-        self.microaneurysmsCheckbox = qt.QCheckBox()
-        self.microaneurysmsCheckbox.setText("Microaneurysms")
-        self.problemsFrameLayout.addWidget(self.microaneurysmsCheckbox, 0, 2)
-        self.problemsButtons.append(self.microaneurysmsCheckbox)
+        self.cottonWoolSpotsCheckbox = qt.QCheckBox()
+        self.cottonWoolSpotsCheckbox.setText("Cotton wool spots")
+        self.problemsFrameLayout.addWidget(self.cottonWoolSpotsCheckbox, 1, 0)
+        self.problemsButtons.append(self.cottonWoolSpotsCheckbox)
+        
+        self.NeovascularisationCheckbox = qt.QCheckBox()
+        self.NeovascularisationCheckbox.setText("Neovascularisation")
+        self.problemsFrameLayout.addWidget(self.NeovascularisationCheckbox, 1, 1)
+        self.problemsButtons.append(self.NeovascularisationCheckbox)
 
         label = qt.QLabel("Diabetic retinopathy diagnosis: ")
         label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
@@ -268,13 +278,14 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         report = {}
         # Problems checked
         for button in self.problemsButtons:
-            report[button.text] = button.isChecked()
+            s = button.text     # TODO: fix when multilanguage
+            report[self.logic.getKey(s)] = button.isChecked()
 
         # Diabetic Retinopathy Score
-        report["DiabeticRetinopathyScore"] = self.diagnosisRadioButtonGroup.checkedId()
+        report[self.logic.getKey("Diabetic Retinopathy Score")] = self.diagnosisRadioButtonGroup.checkedId()
 
         # Additional comments
-        report["AdditionalComments"] = self.additionalCommentsText.plainText
+        report[self.logic.getKey("Additional Comments")] = self.additionalCommentsText.plainText
 
         return report
 
@@ -283,14 +294,14 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         :param data: dictionary of data
         """
         for button in self.problemsButtons:
-            button.setChecked(data[button.text])
+            button.setChecked(data[self.logic.getKey(button.text)])
 
-        score = str(data["DiabeticRetinopathyScore"])
+        score = str(data[self.logic.getKey("Diabetic Retinopathy Score")])
         for button in self.diagnosisRadioButtonGroup.buttons():
             if button.text == score:
                 button.setChecked(True)
                 break
-        self.additionalCommentsText.plainText = data["AdditionalComments"]
+        self.additionalCommentsText.plainText = data[self.logic.getKey("Additional comments")]
 
     def reset(self, closeScene=True):
         if closeScene:
@@ -540,7 +551,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
             self.currentLabelmapVolume.GetStorageNode().WriteData(self.currentLabelmapVolume)
 
         # Save the enhanced volume
-        if self.currentEnhancedVolume.GetStorageNode() is None:
+        if self.getEnhancedVolume().GetStorageNode() is None:
             SlicerUtil.saveNewNode(self.currentEnhancedVolume,
                     os.path.join(self.getCurrentDataFolder(), self.currentEnhancedVolume.GetName() + ".nrrd"))
         else:
@@ -548,6 +559,15 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
 
         self.isCurrentReportSaved = True
         return p
+
+    def getKey(self, description):
+        """ Get a string formatted with the chosen format for keys used in the template.
+        Ex: getKey("Cotton lesions") = "@@COTTON_LESIONS@@"
+        :param description:
+        :return:
+        """
+        return "@@{0}@@".format(description.replace(" ", "_").upper())
+
 
     def __printSnapshots__(self):
         """ Generate snapshots of all the volumes
@@ -568,6 +588,17 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         # Save a png file from the enhanced volume. We manipulate the widget to have the aspect that we want for the screenshot
         lm = slicer.app.layoutManager()
         SlicerUtil.changeLayout(7)
+
+        # If the user didn't open the enhanced volume yet, force it
+        enhancedVol = self.getEnhancedVolume()
+        yellowCompositeNode = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceCompositeNodeYellow')
+        if yellowCompositeNode.GetBackgroundVolumeID() != enhancedVol.GetID():
+            yellowCompositeNode.SetBackgroundVolumeID(enhancedVol.GetID())
+            yellowSliceNode = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow')
+            yellowSliceNode.SetOrientationToAxial()
+            # Assign the labelmap
+            yellowCompositeNode.SetLabelVolumeID(self.currentLabelmapVolume.GetID())
+
         controller = lm.sliceWidget("Yellow").sliceController()
         controller.fitSliceToBackground()
         # Hide the slider bar (just show the picture)
@@ -630,15 +661,17 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
             html = f.read()
 
         # myText = '''<div id="divDescription">{0}</div>'''.format(self.__toHtml__(reportText))
-        html = html.replace("@@RESOURCES_FOLDER@@", self.getResourcePath())
-        html = html.replace("@@DIABETIC_RETINOPATHY_SCORE@@", str(currentValuesDict["DiabeticRetinopathyScore"]))
-        html = html.replace("@@RED_LESIONS@@", "YES" if currentValuesDict["Red lesions"] else "NO")
-        html = html.replace("@@EXUDATES@@", "YES" if currentValuesDict["Exudates"] else "NO")
-        html = html.replace("@@MICROANEURYSMS@@", "YES" if currentValuesDict["Microaneurysms"] else "NO")
-        html = html.replace("@@ADDITIONAL_COMMENTS@@", self.__toHtml__(currentValuesDict["AdditionalComments"]))
-        html = html.replace("@@IMAGE_ORIGINAL@@", self.current2DVectorVolume.GetStorageNode().GetFileName())
-        html = html.replace("@@IMAGE_ANNOTATED@@", self.currentLabelmapVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
-        html = html.replace("@@IMAGE_ENHANCED@@", self.currentEnhancedVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
+        html = html.replace(self.getKey("Resources Folder"), self.getResourcePath())
+        html = html.replace(self.getKey("Diabetic Retinopathy Score"), str(currentValuesDict[self.getKey("Diabetic Retinopathy Score")]))
+
+        for key in (self.getKey("Microaneurysms"), self.getKey("Exudates"), self.getKey("Haemorrhages"),
+                    self.getKey("Cotton wool spots"), self.getKey("Neovascularisation")):
+            html = html.replace(key, "<span style='color: red; font-weight: bold'>YES</span>" if currentValuesDict[key] else "NO")
+
+        html = html.replace(self.getKey("Additional comments"), self.__toHtml__(currentValuesDict[self.getKey("Additional comments")]))
+        html = html.replace(self.getKey("Image Original"), self.current2DVectorVolume.GetStorageNode().GetFileName())
+        html = html.replace(self.getKey("Image Annotated"), self.currentLabelmapVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
+        html = html.replace(self.getKey("Image Enhanced"), self.currentEnhancedVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
 
         return html
 

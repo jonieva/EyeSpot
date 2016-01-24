@@ -8,6 +8,7 @@ import os, sys
 import traceback
 import numpy as np
 import time
+import subprocess
 
 import SimpleITK as sitk
 
@@ -346,11 +347,11 @@ class Util:
         """
         if os.sys.platform == "darwin":
             # MAC
-            os.system('open ' + filePath)
+            #os.system('open ' + filePath)
+            subprocess.call(["open", filePath])
         elif os.sys.platform == "win32":
             # Windows
             os.system('start ' + filePath)
         else:
             # Linux
-            import subprocess
             subprocess.call(["xdg-open", filePath])

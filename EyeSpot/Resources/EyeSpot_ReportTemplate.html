@@ -1,60 +1,2 @@
-<html>
-  <head>
-    <meta  content="text/html; charset=ISO-8859-1"  http-equiv="content-type">
-    <title>EyeSpot</title>
-    <style  type="text/css">
-      #divDescription {
-        margin: 15px 15px 20px 15px;
-      }
-
-      body {
-        
-      }
-      page[size="A4"] {
-        background: white;
-        width: 21cm;
-        height: 29.7cm;
-        display: block;
-        margin: 0 auto;
-        margin-bottom: 0.5cm;
-        box-shadow: 0 0 0.5cm rgba(0,0,0,0.5);
-      }
-      @media print {
-        body, page[size="A4"] {
-          margin: 0;
-          box-shadow: 0;
-        }
-      }
-      .eyeimg {
-        width: 300px; 
-        
-      }
-      .hidden {
-        display: none;
-      }
-
-  </style>
-  </head>
-  <body>
-    <div  class="page">
-      <div  style="width:100%"> <img  src="@@RESOURCES_FOLDER@@/logo.png"  alt="logo"></div>
-      <h1>EyeSpot Report</h1>
-      <div  id="divDescription"  class="divDescription">This is a generic
-        container where we could store information of the patient (to be
-        determined)<br><br>
-        <span  style="font-weight: bold;">Diabetic Retinopathy score:
-          @@DIABETIC_RETINOPATHY_SCORE@@</span><br>
-        <ul>
-          <li>Red Lesions: @@RED_LESIONS@@</li>
-          <li>Exudates: @@EXUDATES@@</li>
-          <li>Microaneurysms: @@MICROANEURYSMS@@</li>
-        </ul>
-        @@ADDITIONAL_COMMENTS@@</div>
-      <div  id="divImages"> 
-        <img  src="@@IMAGE_ORIGINAL@@"  alt="eye_fundus"  class="eyeimg" id="imgOriginal">
-        <img  src="@@IMAGE_ANNOTATED@@"  alt="eye_fundus"  class="eyeimg"  id="imgAnnotated">
-        <img  src="@@IMAGE_ENHANCED@@"  alt="eye_fundus"  class="eyeimg"  id="imgEnhanced">
-      </div>
-    </div>
-  </body>
-</html>
+<html>  <head>    <meta  content="text/html; charset=ISO-8859-1"  http-equiv="content-type">    <title>EyeSpot</title>    <style  type="text/css">      #divDescription {        margin: 15px 15px 20px 15px;      }      body {              }            h1 {        font-size: 15pt;      }            page[size="A4"] {        background: white;        width: 21cm;        height: 29.7cm;        display: block;        margin: 0 auto;        margin-bottom: 0.5cm;        box-shadow: 0 0 0.5cm rgba(0,0,0,0.5);      }      @media print {        body, page[size="A4"] {          margin: 0;          box-shadow: 0;        }      }      .eyeimg {        width: 300px;               }      .hidden {        display: none;      }        </style>  </head>  <body>    <div  class="page">      <div  style="width:100%"> <img  src="@@RESOURCES_FOLDER@@/logo.png"  alt="logo"           style="width:300px"></div>      <h1>Ophtalmology Report</h1>      <div  id="divDescription"  class="divDescription">@@ADDITIONAL_COMMENTS@@        <div  style="margin-top:10px"> <span  style="font-weight: bold;">Diabetic
+            Retinopathy score: @@DIABETIC_RETINOPATHY_SCORE@@ </span> </div>        <ul>          <li>Microaneurysms: @@MICROANEURYSMS@@</li>          <li>Exudates: @@EXUDATES@@</li>          <li>Haemorrhages: @@HAEMORRHAGES@@</li>          <li>Cotton wool spots: @@COTTON_WOOL_SPOTS@@</li>          <li>Neovascularisation: @@NEOVASCULARISATION@@</li>        </ul>      </div>      <div  id="divImages"> <img  src="@@IMAGE_ORIGINAL@@"  alt="eye_fundus"  class="eyeimg"           id="imgOriginal">        <img  src="@@RESOURCES_FOLDER@@/Legend.png"  class="eyeimg"  alt="legend">        <img  src="@@IMAGE_ANNOTATED@@"  alt="eye_fundus"  class="eyeimg"  id="imgAnnotated">        <img  src="@@IMAGE_ENHANCED@@"  alt="eye_fundus"  class="eyeimg"  id="imgEnhanced">      </div>      <div  style="margin-top: 20px; font-size: 12px; color: rgb(187, 187, 187);">        This report has been elaborated using <b>EyeSpot</b> software tools </div>    </div>  </body></html>
