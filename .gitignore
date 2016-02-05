@@ -3,3 +3,6 @@
 !/.gitignore
 
 *.pyc
+
+EyeSpot/Resources/EyeSpot_ReportTemplate.html.bak
+sample images/

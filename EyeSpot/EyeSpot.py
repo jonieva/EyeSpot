@@ -6,7 +6,7 @@ from slicer.ScriptedLoadableModule import *
 import logging
 import json
 import ui
-from logic import SlicerUtil, Util
+from logic import SlicerUtil, Util, Enhancer
 #
 # EyeSpot
 #
@@ -108,19 +108,59 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.editorWidget.toolsColor.terminologyCollapsibleButton.setVisible(False)
         self.layout.addWidget(self.editorCollapsibleButton)
 
+        ### DIAGNOSIS
         self.diagnosisCollapsibleButton = ctk.ctkCollapsibleButton()
         self.diagnosisCollapsibleButton.text = "Diagnosis"
         self.diagnosisCollapsibleButton.collapsed = False
         self.layout.addWidget(self.diagnosisCollapsibleButton)
         self.diagnosisAreaLayout = qt.QVBoxLayout(self.diagnosisCollapsibleButton)
 
+        # Visual Acuity
+        label = qt.QLabel("Visual acuity (VA): ")
+        label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
+        self.diagnosisAreaLayout.addWidget(label)
+        self.vaFrame = qt.QFrame()
+        self.vaFrame.setFrameStyle(0x0002 | 0x0010)
+        self.vaFrame.lineWidth = 2
+        self.vaFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
+        self.vaFrame.setFixedWidth(240)
+        self.diagnosisAreaLayout.addWidget(self.vaFrame)
+
+        self.vaFrameLayout = qt.QGridLayout(self.vaFrame)
+        self.vaFrameLayout.addWidget(qt.QLabel("OS"), 0, 0)
+        self.osLineEdit = qt.QLineEdit()
+        self.osLineEdit.setFixedWidth(80)
+        self.osLineEdit.setStyleSheet("background-color: white" )
+        self.vaFrameLayout.addWidget(self.osLineEdit, 0, 1)
+
+        self.vaFrameLayout.addWidget(qt.QLabel("OD"), 1, 0)
+        self.odLineEdit = qt.QLineEdit()
+        self.odLineEdit.setFixedWidth(80)
+        self.odLineEdit.setStyleSheet("background-color: white" )
+        self.vaFrameLayout.addWidget(self.odLineEdit, 1, 1)
+
+
+        self.vaModalityButtonGroup = qt.QButtonGroup()
+        self.scvaRadioButton = qt.QRadioButton()
+        self.scvaRadioButton.setText("SCVA")
+        self.vaFrameLayout.addWidget(self.scvaRadioButton, 0, 2)
+        self.vaModalityButtonGroup.addButton(self.scvaRadioButton)
+
+        self.bcvaRadioButton = qt.QRadioButton()
+        self.bcvaRadioButton.setText("BCVA")
+        self.vaFrameLayout.addWidget(self.bcvaRadioButton, 1, 2)
+        self.vaModalityButtonGroup.addButton(self.bcvaRadioButton)
+
+        self.ucvaRadioButton = qt.QRadioButton()
+        self.ucvaRadioButton.setText("UCVA")
+        self.vaFrameLayout.addWidget(self.ucvaRadioButton, 2, 2)
+        self.vaModalityButtonGroup.addButton(self.ucvaRadioButton)
+
         # Problems detected
-        # row += 1
         label = qt.QLabel("Problems detected: ")
         label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
         self.diagnosisAreaLayout.addWidget(label)
 
-        # row += 1
         self.problemsFrame = qt.QFrame()
         self.problemsFrame.setFrameStyle(0x0002 | 0x0010)
         self.problemsFrame.lineWidth = 2
@@ -160,21 +200,21 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         label.setStyleSheet("margin: 10px 0 0 10px; font-weight: bold")
         self.diagnosisAreaLayout.addWidget(label)
 
-        # Diagnosis
-        self.diagnosisFrame = qt.QFrame()
-        self.diagnosisFrame.setFrameStyle(0x0002 | 0x0010)
-        self.diagnosisFrame.lineWidth = 2
-        self.diagnosisFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
-        self.diagnosisAreaLayout.addWidget(self.diagnosisFrame)
+        # Diabetic Retinopathy diagnosis
+        self.diabeticRetinopathyDiagnosisFrame = qt.QFrame()
+        self.diabeticRetinopathyDiagnosisFrame.setFrameStyle(0x0002 | 0x0010)
+        self.diabeticRetinopathyDiagnosisFrame.lineWidth = 2
+        self.diabeticRetinopathyDiagnosisFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
+        self.diagnosisAreaLayout.addWidget(self.diabeticRetinopathyDiagnosisFrame)
 
-        self.diagnosisFrameLayout = qt.QHBoxLayout()
-        self.diagnosisFrame.setLayout(self.diagnosisFrameLayout)
+        self.diabeticRetinopathyDiagnosisFrameLayout = qt.QHBoxLayout()
+        self.diabeticRetinopathyDiagnosisFrame.setLayout(self.diabeticRetinopathyDiagnosisFrameLayout)
 
         self.diagnosisRadioButtonGroup = qt.QButtonGroup()
         for i in range(5):
             rb = qt.QRadioButton(str(i))
             self.diagnosisRadioButtonGroup.addButton(rb, i)
-            self.diagnosisFrameLayout.addWidget(rb)
+            self.diabeticRetinopathyDiagnosisFrameLayout.addWidget(rb)
         self.diagnosisRadioButtonGroup.buttons()[0].setChecked(True)
 
         # Additional comments
@@ -276,6 +316,13 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         :return: dictionary with the content
         """
         report = {}
+        # VA
+        report[self.logic.getKey("OS")] = self.osLineEdit.text
+        report[self.logic.getKey("OD")] = self.odLineEdit.text
+        report[self.logic.getKey("VA Modality")] = \
+            self.vaModalityButtonGroup.checkedButton().text if self.vaModalityButtonGroup.checkedButton() is not None \
+            else ""
+
         # Problems checked
         for button in self.problemsButtons:
             s = button.text     # TODO: fix when multilanguage
@@ -293,14 +340,25 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         """ Load the GUI values from a dictionary that contains the report data
         :param data: dictionary of data
         """
+        # VA
+        self.osLineEdit.text = data[self.logic.getKey("OS")]
+        self.odLineEdit.text = data[self.logic.getKey("OD")]
+        for button in self.vaModalityButtonGroup.buttons():
+            if button.text == data[self.logic.getKey("VA Modality")]:
+                button.setChecked(True)
+                break
+
+        # Problems
         for button in self.problemsButtons:
             button.setChecked(data[self.logic.getKey(button.text)])
 
+        # Score
         score = str(data[self.logic.getKey("Diabetic Retinopathy Score")])
         for button in self.diagnosisRadioButtonGroup.buttons():
             if button.text == score:
                 button.setChecked(True)
                 break
+        # Additional comments
         self.additionalCommentsText.plainText = data[self.logic.getKey("Additional comments")]
 
     def reset(self, closeScene=True):
@@ -407,6 +465,8 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         self.currentEnhancedVolume = None       # Enhanced 3D volume
         self.currentReportData = None           # Dictionary for the report data (lesions, comments, etc.)
 
+        self.enhancer = None                    # Enhancer object
+
         # Customized colors for the labelmap
         p = self.getResourcePath("EyeSpot_Colors.ctbl")
         self.colorTableNode = slicer.modules.colors.logic().LoadColorFile(p)
@@ -512,17 +572,21 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
 
     def __calculateEnhancedVolume__(self):
         logic = slicer.modules.volumes.logic()
-        self.currentEnhancedVolume = logic.CloneVolume(self.currentScalarVolume, self.current2DVectorVolume.GetName() + "_enh")
-        # self.currentEnhancedVectorVolume = slicer.vtkMRMLVectorVolumeNode()
-        # self.currentEnhancedVectorVolume.Copy(self.current2DVectorVolume)
-        # slicer.mrmlScene.AddNode(self.currentEnhancedVectorVolume)
+        self.currentEnhancedVolume = logic.CloneVolume(self.current2DVectorVolume, self.current2DVectorVolume.GetName() + "_enh")
+        #self.currentEnhancedVectorVolume = slicer.vtkMRMLVectorVolumeNode()
+        #self.currentEnhancedVectorVolume.Copy(self.current2DVectorVolume)
+        #slicer.mrmlScene.AddNode(self.currentEnhancedVectorVolume)
+        image_array = slicer.util.array(self.currentEnhancedVolume.GetID())
 
         # Set a storage node for the volume and load the data
+        #image_array = slicer.util.array(self.current2DVectorVolume.GetName())
+        #image_array = image_array[0]    # Remove "extra" dimension
+        self.enhancer = Enhancer(image_array[0])
+        output_array = self.enhancer.execute_enhancement()
+        image_array[0, :, :, :] = output_array[:,:,:]
 
-
-        a = slicer.util.array(self.currentEnhancedVolume.GetID())
-        b = slicer.util.array(self.current2DVectorVolume.GetID())
-        a[0, :, :] = b[0, :, :, 1]
+        # b = slicer.util.array(self.current2DVectorVolume.GetID())
+        # a[0, :, :] = b[0, :, :, 1]
         self.currentEnhancedVolume.GetImageData().Modified()
         #self.currentEnhancedVectorVolume = self.currentScalarVolume
 
@@ -662,16 +726,27 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
 
         # myText = '''<div id="divDescription">{0}</div>'''.format(self.__toHtml__(reportText))
         html = html.replace(self.getKey("Resources Folder"), self.getResourcePath())
-        html = html.replace(self.getKey("Diabetic Retinopathy Score"), str(currentValuesDict[self.getKey("Diabetic Retinopathy Score")]))
 
+        # VA
+        for key in ("OS", "OD", "VA Modality"):
+            key = self.getKey("OS")
+            html = html.replace(key, currentValuesDict[key])
+
+        # Problems
         for key in (self.getKey("Microaneurysms"), self.getKey("Exudates"), self.getKey("Haemorrhages"),
                     self.getKey("Cotton wool spots"), self.getKey("Neovascularisation")):
             html = html.replace(key, "<span style='color: red; font-weight: bold'>YES</span>" if currentValuesDict[key] else "NO")
 
-        html = html.replace(self.getKey("Additional comments"), self.__toHtml__(currentValuesDict[self.getKey("Additional comments")]))
+        # Score
+        html = html.replace(self.getKey("Diabetic Retinopathy Score"), str(currentValuesDict[self.getKey("Diabetic Retinopathy Score")]))
+
+        # Images
         html = html.replace(self.getKey("Image Original"), self.current2DVectorVolume.GetStorageNode().GetFileName())
         html = html.replace(self.getKey("Image Annotated"), self.currentLabelmapVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
         html = html.replace(self.getKey("Image Enhanced"), self.currentEnhancedVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
+
+        # Additional comments
+        html = html.replace(self.getKey("Additional comments"), self.__toHtml__(currentValuesDict[self.getKey("Additional comments")]))
 
         return html
 
