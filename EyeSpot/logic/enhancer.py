@@ -5,7 +5,7 @@ import numpy as np
 class Enhancer(object):
     def __init__(self, original_image_array):
         self.original_image_array = original_image_array
-        self.im_eq = None
+        self.im_crahe = None
         self.im_out = None
         self.enhanced_image = None
 
@@ -20,17 +20,18 @@ class Enhancer(object):
         # rect = [np.min(fil), np.max(fil), np.min(col), np.max(col)]
         # self.image_crop = self.original_image_array[rect[0]:rect[1], rect[2]:rect[3]]
         # image_crop_green = self.image_crop[:, :, 1]
-        self.image_crop = self.original_image_array
-        image_crop_green = self.original_image_array[:, :, 1]
+        #self.image_crop = self.original_image_array
+        #image_green = self.original_image_array[:, :, 1]
 
         # Equalization of channel
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        self.im_eq = np.zeros(self.image_crop.shape, np.uint8)
-        self.im_eq[:, :, 0] = self.image_crop[:, :, 0]  # clahe.apply(self.image_crop(:,:,0))
-        self.im_eq[:, :, 1] = clahe.apply(image_crop_green)
-        self.im_eq[:, :, 2] = self.image_crop[:, :, 2]  # clahe.apply(self.image_crop(:,:,2))
+        #self.im_crahe = np.zeros(self.original_image_array.shape, np.uint8)
+        self.im_crahe = np.copy(self.original_image_array)
+        # self.im_crahe[:, :, 0] = self.original_image_array[:, :, 0]  # clahe.apply(self.image_crop(:,:,0))
+        self.im_crahe[:, :, 1] = clahe.apply(self.original_image_array[:, :, 1])
+        # self.im_crahe[:, :, 2] = self.original_image_array[:, :, 2]  # clahe.apply(self.image_crop(:,:,2))
 
-        im_eq_green = self.im_eq[:, :, 1].astype(np.float64)
+        im_eq_green = self.im_crahe[:, :, 1].astype(np.float64)
 
         # FRANGI filter
         # Options = struct('FrangiScaleRange', [2 6], 'FrangiScaleRatio', 0.5, 'FrangiBetaOne', 0.5, 'FrangiBetaTwo', 15, 'verbose',true,'BlackWhite',true);
@@ -73,19 +74,19 @@ class Enhancer(object):
             DGxx = (X ** 2 / sigma ** 4 - 1 / sigma ** 2) * G
             DG = (X / sigma ** 2) * G
 
-            Dxx2 = np.apply_along_axis(lambda m: np.convolve(m, DGxx, mode='same'), axis=0, arr=im_eq_green)
-            Dxx2 = np.apply_along_axis(lambda m: np.convolve(m, G.T, mode='same'), axis=1, arr=Dxx2)
+            Dxx = np.apply_along_axis(lambda m: np.convolve(m, DGxx, mode='same'), axis=0, arr=im_eq_green)
+            Dxx = np.apply_along_axis(lambda m: np.convolve(m, G.T, mode='same'), axis=1, arr=Dxx)
 
-            Dyy2 = np.apply_along_axis(lambda m: np.convolve(m, DGxx.T, mode='same'), axis=1, arr=im_eq_green)
-            Dyy2 = np.apply_along_axis(lambda m: np.convolve(m, G, mode='same'), axis=0, arr=Dyy2)
+            Dyy = np.apply_along_axis(lambda m: np.convolve(m, DGxx.T, mode='same'), axis=1, arr=im_eq_green)
+            Dyy = np.apply_along_axis(lambda m: np.convolve(m, G, mode='same'), axis=0, arr=Dyy)
 
-            Dxy2 = np.apply_along_axis(lambda m: np.convolve(m, DG, mode='same'), axis=0, arr=im_eq_green)
-            Dxy2 = np.apply_along_axis(lambda m: np.convolve(m, DG.T, mode='same'), axis=1, arr=Dxy2)
+            Dxy = np.apply_along_axis(lambda m: np.convolve(m, DG, mode='same'), axis=0, arr=im_eq_green)
+            Dxy = np.apply_along_axis(lambda m: np.convolve(m, DG.T, mode='same'), axis=1, arr=Dxy)
 
             # TODO: replace Dxx2 wih Dxx from the beggining
-            Dxx = Dxx2
-            Dxy = Dxy2
-            Dyy = Dyy2
+            # Dxx = Dxx2
+            # Dxy = Dxy2
+            # Dyy = Dyy2
 
             # TESTING
             # np.abs(Dxy-Dxy2).max()
@@ -145,20 +146,22 @@ class Enhancer(object):
         ###  Vascular enhancement
         # This vascular factor should ny go from 0 to 1
         # vascular_factor = 1
-        if self.im_eq is None or self.im_out is None:
+        if self.im_crahe is None or self.im_out is None:
+            print "DEBUG: calculating core matrixes"
             self.__calculate_core_matrixes__()
 
-        im_eq2 = np.zeros(self.im_eq.shape, self.im_eq.dtype)
+        im_eq2 = np.zeros(self.im_crahe.shape, self.im_crahe.dtype)
 
         for i in range(3):
-            aux = self.im_eq[:, :, i] - vascular_factor * 128 * self.im_out
+            aux = self.im_crahe[:, :, i] - vascular_factor * 128 * self.im_out
             aux[aux < 0] = 0
-            im_eq2[:, :, i] = np.copy(aux)
+            im_eq2[:, :, i] = aux[:,:]
+
 
         # This enhancement factor goes form 0 to 1 also.
         #enhancement_factor = 1
 
-        self.enhanced_image = self.image_crop.astype(np.float64) * (1 - enhancement_factor) + im_eq2.astype(
+        self.enhanced_image = self.im_crahe.astype(np.float64) * (1.0 - enhancement_factor) + im_eq2.astype(
             np.float64) * enhancement_factor
         self.enhanced_image = self.enhanced_image.astype(np.uint8)
         return self.enhanced_image

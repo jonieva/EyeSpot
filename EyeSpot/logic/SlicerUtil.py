@@ -115,6 +115,7 @@ class SlicerUtil:
         for windowName in lm.sliceViewNames():
             slice = lm.sliceWidget(windowName)
             if not slice.isHidden():
+                print("repaint {0}".format(windowName))
                 slice.repaint()
 
     @staticmethod
@@ -393,7 +394,12 @@ class SlicerUtil:
         """
         applicationLogic = slicer.app.applicationLogic()
         interactionNode = applicationLogic.GetInteractionNode()
-        interactionNode.Reset()
+        # Change in signature in Reset method.
+        try:
+            interactionNode.Reset(None)
+        except:
+            # Backwards compatibility
+            interactionNode.Reset()
         layoutManager = slicer.app.layoutManager()
         layoutManager.layoutChanged(layoutNumber)
         # Call this function to force the refresh of properties like the field of view of the sliceNodes

@@ -39,6 +39,10 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         del self.logic
         self.logic = EyeSpotLogic()
 
+    @property
+    def isExpertMode(self):
+        return self.expertModeCheckbox.checked
+
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
 
@@ -68,35 +72,59 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.caseInfoFrame.setStyleSheet("background-color: #EEEEEE; margin: 10px")
         self.caseAreaLayout.addWidget(self.caseInfoFrame, row, 0, 1, 2)
 
-        self.caseInfoFrameLayout = qt.QVBoxLayout()
+        self.caseInfoFrameLayout = qt.QGridLayout()
         self.caseInfoFrame.setLayout(self.caseInfoFrameLayout)
 
         self.caseIdLabel = qt.QLabel("Case id: ")
-        self.caseInfoFrameLayout.addWidget(self.caseIdLabel)
-
-        # self.caseInfoFrameLayout.addWidget(qt.QLabel("Display the following images:"))
+        self.caseIdLabel.setStyleSheet("font-weight: bold")
+        self.caseInfoFrameLayout.addWidget(self.caseIdLabel, 0, 0)
 
         self.showEnhancementCheckboxGroup = qt.QButtonGroup()
         self.showJustOriginalButton = qt.QRadioButton("Original only")
         self.showJustOriginalButton.setChecked(True)
         self.showEnhancementCheckboxGroup.addButton(self.showJustOriginalButton, 0)
-        self.caseInfoFrameLayout.addWidget(self.showJustOriginalButton)
+        self.caseInfoFrameLayout.addWidget(self.showJustOriginalButton, 1, 0)
 
         self.showOriginalPlusEnhancedButton = qt.QRadioButton("Original and enhanced")
         self.showEnhancementCheckboxGroup.addButton(self.showOriginalPlusEnhancedButton, 1)
-        self.caseInfoFrameLayout.addWidget(self.showOriginalPlusEnhancedButton)
+        self.caseInfoFrameLayout.addWidget(self.showOriginalPlusEnhancedButton, 2, 0)
 
         self.showJustEnhancedButton = qt.QRadioButton("Enhanced only")
         self.showEnhancementCheckboxGroup.addButton(self.showJustEnhancedButton, 2)
-        self.caseInfoFrameLayout.addWidget(self.showJustEnhancedButton)
+        self.caseInfoFrameLayout.addWidget(self.showJustEnhancedButton, 3, 0)
 
-        # Center Volumes button
+         # Center Volumes button
         self.centerVolumesButton = ctk.ctkPushButton()
         self.centerVolumesButton.text = "Center image/s"
         self.centerVolumesButton.toolTip = "Center all the current visible images"
         self.centerVolumesButton.setFixedWidth(200)
         # self.centerVolumesButton.toolTip = "Load a case folder"
-        self.caseInfoFrameLayout.addWidget(self.centerVolumesButton)
+        self.caseInfoFrameLayout.addWidget(self.centerVolumesButton, 4, 0)
+
+        # Enhancement fine tuning
+        label = qt.QLabel("Vascular factor")
+        label.setStyleSheet("font-weight: bold")
+        self.caseInfoFrameLayout.addWidget(label, 0, 1)
+        self.vascularFactorSlider = qt.QSlider()
+        self.vascularFactorSlider.orientation = 2  # Vertical
+        self.vascularFactorSlider.value = 5
+        self.vascularFactorSlider.minimum = 0
+        self.vascularFactorSlider.maximum = 10
+        # self.vascularFactorSlider.setStyleSheet("margin-top:10px;padding-top:20px")
+       # self.vascularFactorSlider.setToolTip("Move the slider for a fine tuning segmentation")
+        self.caseInfoFrameLayout.addWidget(self.vascularFactorSlider, 1, 1, 4, 1, 0x0004)
+
+        label = qt.QLabel("Enhancement factor")
+        label.setStyleSheet("font-weight: bold")
+        self.caseInfoFrameLayout.addWidget(label, 0, 2)
+        self.enhancementFactorSlider = qt.QSlider()
+        self.enhancementFactorSlider.orientation = 2  # Vertical
+        self.enhancementFactorSlider.minimum = 0
+        self.enhancementFactorSlider.maximum = 10
+        self.enhancementFactorSlider.value = 5
+        # self.vascularFactorSlider.setStyleSheet("margin-top:10px;padding-top:20px")
+       # self.vascularFactorSlider.setToolTip("Move the slider for a fine tuning segmentation")
+        self.caseInfoFrameLayout.addWidget(self.enhancementFactorSlider, 1, 2, 4, 1, 0x0004)
 
         # Editor
         row += 1
@@ -235,7 +263,14 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.printReportButton.text = "Save and generate PDF"
         self.diagnosisAreaLayout.addWidget(self.printReportButton)
 
-
+        self.expertModeCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.expertModeCollapsibleButton.text = "Expert mode"
+        self.expertModeCollapsibleButton.collapsed = True
+        self.layout.addWidget(self.expertModeCollapsibleButton)
+        self.expertModeLayout = qt.QVBoxLayout(self.expertModeCollapsibleButton)
+        self.expertModeCheckbox = qt.QCheckBox("Activate expert mode")
+        self.expertModeCheckbox.checked = True
+        self.expertModeLayout.addWidget(self.expertModeCheckbox)
         self.layout.addStretch(1)
 
         # Connections
@@ -243,9 +278,12 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         # self.loadReportButton.connect('clicked()', self.__onLoadReportClicked__)
         self.showEnhancementCheckboxGroup.connect("buttonClicked (int)", self.__onEnhancementButtonGroupClicked__)
         self.centerVolumesButton.connect('clicked()', SlicerUtil.centerAllVolumes)
+        self.vascularFactorSlider.connect('sliderReleased()', self.__onEnhancementFineTuning__)
+        self.enhancementFactorSlider.connect('sliderReleased()', self.__onEnhancementFineTuning__)
         self.saveReportButton.connect('clicked()', self.__onSaveReportClicked__)
         self.printReportButton.connect('clicked()', self.__onPrintReportClicked__)
         self.resetButton.connect('clicked()', self.reset)
+        self.expertModeCheckbox.connect("stateChanged(int)", self.__onExpertModeStateChanged__)
         slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.EndCloseEvent, self.__onSceneClosed__)
 
         # Set default layout Red
@@ -258,18 +296,37 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         return self.logic.current2DVectorVolume is not None
 
     def refreshUI(self):
+        # User mode or expert mode
+
+        #if self.expertMode.checked:
+            # Expert mode
+            # Hide toolbars
+         #   SlicerUtil.showToolbars(False)
+            # Hide slice bars
+        SlicerUtil.showToolbars(self.isExpertMode)
+        lm = slicer.app.layoutManager()
+        controller = lm.sliceWidget("Red").sliceController()
+        controller.showLabelOutline(True)
+        controller.visible = self.isExpertMode
+        controller = lm.sliceWidget("Yellow").sliceController()
+        controller.showLabelOutline(True)
+        controller.visible = self.isExpertMode
+        dataProbeCollapsibleButton = [b for b in slicer.util.mainWindow().findChildren("ctkCollapsibleButton")
+                                      if b.text == "Data Probe"][0]
+        dataProbeCollapsibleButton.setVisible(self.isExpertMode)
+
+
         # Link windows
         compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
         for compNode in compNodes.itervalues():
             compNode.SetLinkedControl(True)
             # compNode.SetLabelOpacity(0.3)
 
-        self.__setLabelmapOutlines__()
+        # self.__setLabelmapOutlines__()
 
-        self.resetButton.setVisible(self.isCaseLoaded)
-        self.caseInfoFrame.setVisible(self.isCaseLoaded)
-        self.editorCollapsibleButton.setVisible(self.isCaseLoaded)
-        self.diagnosisCollapsibleButton.setVisible(self.isCaseLoaded)
+        self.resetButton.visible = self.caseInfoFrame.visible = \
+            self.editorCollapsibleButton.visible = self.diagnosisCollapsibleButton.visible = \
+            self.isCaseLoaded or self.isExpertMode
 
 
         if self.isCaseLoaded:
@@ -369,6 +426,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.refreshUI()
 
 
+
     def enter(self):
         """This is invoked every time that we select this module as the active module in Slicer (not only the first time)"""
         self.__setLabelmapOutlines__()
@@ -407,6 +465,9 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
                     self.loadGUIFromReportData(self.logic.currentReportData)
         self.refreshUI()
 
+    def __onEnhancementFineTuning__(self):
+        self.logic.enhancementFineTuning(self.vascularFactorSlider.value / 10.0, self.enhancementFactorSlider.value / 10.0)
+
     def __onSaveReportClicked__(self):
         reportPath = self.logic.saveReport(self.getCurrentReportData())
         qt.QMessageBox.information(slicer.util.mainWindow(), 'Report saved',
@@ -428,6 +489,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.refreshUI()
 
         if buttonId in (1,2):
+            # Both or enhanced only. We have to retrieve the enhanced volume
             sliceNodeYellow = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow')
             # Get the enhanced volume
             enhancedVol = self.logic.getEnhancedVolume()
@@ -441,6 +503,9 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
                 fov = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed').GetFieldOfView()
                 sliceNodeYellow.SetFieldOfView(fov[0], fov[1], 1)
 
+    def __onExpertModeStateChanged__(self, state):
+        self.refreshUI()
+        
     def __onSceneClosed__(self, arg1, arg2):
         self.reset(False)
 #
@@ -463,6 +528,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         self.currentScalarVolume = None         # 3D volume to represent the original image
         self.currentLabelmapVolume = None       # Labelmap
         self.currentEnhancedVolume = None       # Enhanced 3D volume
+        self.currentEnhancedImageArray = None   # Numpy array associated with the enhanced volume
         self.currentReportData = None           # Dictionary for the report data (lesions, comments, etc.)
 
         self.enhancer = None                    # Enhancer object
@@ -571,24 +637,32 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         return self.currentEnhancedVolume
 
     def __calculateEnhancedVolume__(self):
+        """ Calculate the enhanced volume for the first time
+        :return:
+        """
         logic = slicer.modules.volumes.logic()
         self.currentEnhancedVolume = logic.CloneVolume(self.current2DVectorVolume, self.current2DVectorVolume.GetName() + "_enh")
         #self.currentEnhancedVectorVolume = slicer.vtkMRMLVectorVolumeNode()
         #self.currentEnhancedVectorVolume.Copy(self.current2DVectorVolume)
         #slicer.mrmlScene.AddNode(self.currentEnhancedVectorVolume)
-        image_array = slicer.util.array(self.currentEnhancedVolume.GetID())
+        self.currentEnhancedImageArray = slicer.util.array(self.currentEnhancedVolume.GetID())
 
         # Set a storage node for the volume and load the data
         #image_array = slicer.util.array(self.current2DVectorVolume.GetName())
         #image_array = image_array[0]    # Remove "extra" dimension
-        self.enhancer = Enhancer(image_array[0])
-        output_array = self.enhancer.execute_enhancement()
-        image_array[0, :, :, :] = output_array[:,:,:]
-
-        # b = slicer.util.array(self.current2DVectorVolume.GetID())
-        # a[0, :, :] = b[0, :, :, 1]
-        self.currentEnhancedVolume.GetImageData().Modified()
+        self.enhancer = Enhancer(self.currentEnhancedImageArray[0])
+        self.enhancementFineTuning()
         #self.currentEnhancedVectorVolume = self.currentScalarVolume
+
+    def enhancementFineTuning(self, vascularFactor=0.5, enhancementFactor=0.5):
+        """ Adjust the enhancement with fine tuning params
+        :param vascularFactor: 0-1 value
+        :param enhancementFactor: 0-1 value
+        """
+        arr = slicer.util.array(self.currentEnhancedVolume.GetID())
+        output_array = self.enhancer.execute_enhancement(vascularFactor, enhancementFactor)
+        arr[0, :, :, :] = output_array[:,:,:]
+        self.currentEnhancedVolume.Modified()   # Refresh display
 
     def getResourcePath(self, fileName=""):
         """ Get a full path for the current resoure file name
