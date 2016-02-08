@@ -545,7 +545,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         properties['singleFile'] = True
         dirName = os.path.basename(os.path.normpath(directory))
         for f in os.listdir(directory):
-            if f == dirName + ".png":
+            if f in (dirName + ".png", dirName + ".tiff"):
                 # Load the main image
                 p = os.path.join(directory, f)
                 (loaded, volume) = slicer.util.loadVolume(p, properties, returnNode=True)
@@ -562,12 +562,16 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
                 (loaded, volume) = slicer.util.loadLabelVolume(p, returnNode=True)
                 if loaded:
                     self.currentLabelmapVolume = volume
-            elif f == dirName + "_enh.nrrd":
-                # Load a previously existing enhanced volume
-                p = os.path.join(directory, f)
-                (loaded, volume) = slicer.util.loadVolume(p, returnNode=True)
-                if loaded:
-                    self.currentEnhancedVolume = volume
+            # TODO: reuse already calculated enhanced volume. We will need to calculate the needed matrixes
+            # elif f == dirName + "_enh.nrrd":
+            #     # Load a previously existing enhanced volume
+            #     p = os.path.join(directory, f)
+            #     (loaded, volume) = slicer.util.loadVolume(p, returnNode=True)
+            #     if loaded:
+            #         # Create all the required structures for the Enhanced volume
+            #         self.currentEnhancedVolume = volume
+            #         self.currentEnhancedImageArray = slicer.util.array(self.currentEnhancedVolume.GetID())
+            #         self.enhancer = Enhancer(self.currentEnhancedImageArray[0])
             elif f == "report.json":
                 p = os.path.join(directory, f)
                 with open(p) as f:
@@ -655,9 +659,8 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         :param vascularFactor: 0-1 value
         :param enhancementFactor: 0-1 value
         """
-        arr = slicer.util.array(self.currentEnhancedVolume.GetID())
         output_array = self.enhancer.execute_enhancement(vascularFactor, enhancementFactor)
-        arr[0, :, :, :] = output_array[:,:,:]
+        self.currentEnhancedImageArray[0, :, :, :] = output_array[:,:,:]
         self.currentEnhancedVolume.Modified()   # Refresh display
 
     def getResourcePath(self, fileName=""):
