@@ -257,10 +257,12 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
         self.saveReportButton = ctk.ctkPushButton()
         self.saveReportButton.text = "Save report"
+        self.saveReportButton.setFixedWidth(300)
         self.diagnosisAreaLayout.addWidget(self.saveReportButton)
 
         self.printReportButton = ctk.ctkPushButton()
         self.printReportButton.text = "Save and generate PDF"
+        self.printReportButton.setFixedWidth(300)
         self.diagnosisAreaLayout.addWidget(self.printReportButton)
 
         self.expertModeCollapsibleButton = ctk.ctkCollapsibleButton()
