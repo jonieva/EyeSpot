@@ -345,13 +345,15 @@ class Util:
         """ Open a file with the default system application
         :param filePath: file to open
         """
+        print ("Opening " + filePath)
         if os.sys.platform == "darwin":
             # MAC
             #os.system('open ' + filePath)
             subprocess.call(["open", filePath])
         elif os.sys.platform == "win32":
             # Windows
-            os.system('start ' + filePath)
+            #os.system('start "{0}"'.format(filePath))
+            os.startfile(filePath)
         else:
             # Linux
             subprocess.call(["xdg-open", filePath])

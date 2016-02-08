@@ -119,6 +119,14 @@ class SlicerUtil:
                 slice.repaint()
 
     @staticmethod
+    def hideAllCornerAnnotations():
+        lm = slicer.app.layoutManager()
+        for key in lm.sliceViewNames():
+            sliceView = lm.sliceWidget(key).sliceView()
+            sliceView.cornerAnnotation().ClearAllTexts()
+            sliceView.scheduleRender()
+
+    @staticmethod
     def isSlicerACILLoaded():
         """ Check the existence of the common ACIL module
         :return: True if the module is found
@@ -406,6 +414,24 @@ class SlicerUtil:
         slicer.app.processEvents()
 
     @staticmethod
+    def changeLayoutRedSingle():
+        """ Change to Red slice only
+        """
+        SlicerUtil.changeLayout(6)
+
+    @staticmethod
+    def changeLayoutYellowSingle():
+        """ Change to Red slice only
+        """
+        SlicerUtil.changeLayout(7)
+
+    @staticmethod
+    def changeLayoutRedAndYellow():
+        """ Change to Red slice only
+        """
+        SlicerUtil.changeLayout(29)
+
+    @staticmethod
     def changeContrastWindow(window, level):
         """ Adjust the window contrast level in the range min-max.
         Note: it takes the first visible node in 2D windows
@@ -485,7 +511,7 @@ class SlicerUtil:
             compNode.SetForegroundOpacity(opacity)
 
     @staticmethod
-    def takeSnapshot(fullFileName, type=-1):
+    def takeSnapshot(fullFileName, type=-1, hideAnnotations=False):
         """ Save a png snapshot of the specified window
         :param fullFileName: Full path name of the output file (ex: "/Data/output.png")
         :param type: slicer.qMRMLScreenShotDialog.FullLayout, slicer.qMRMLScreenShotDialog.ThreeD,
@@ -518,6 +544,8 @@ class SlicerUtil:
             # reset the type so that the node is set correctly
             #type = slicer.qMRMLScreenShotDialog.FullLayout
 
+        if hideAnnotations:
+            SlicerUtil.hideAllCornerAnnotations()
         # grab and convert to vtk image data
         qpixMap = qt.QPixmap().grabWidget(widget)
         # Save as a png file

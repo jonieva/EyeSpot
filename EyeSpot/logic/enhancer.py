@@ -147,7 +147,6 @@ class Enhancer(object):
         # This vascular factor should ny go from 0 to 1
         # vascular_factor = 1
         if self.im_crahe is None or self.im_out is None:
-            print "DEBUG: calculating core matrixes"
             self.__calculate_core_matrixes__()
 
         im_eq2 = np.zeros(self.im_crahe.shape, self.im_crahe.dtype)

@@ -102,9 +102,9 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.caseInfoFrameLayout.addWidget(self.centerVolumesButton, 4, 0)
 
         # Enhancement fine tuning
-        label = qt.QLabel("Vascular factor")
-        label.setStyleSheet("font-weight: bold")
-        self.caseInfoFrameLayout.addWidget(label, 0, 1)
+        self.vascularFactorLabel = qt.QLabel("Vascular factor")
+        self.vascularFactorLabel.setStyleSheet("font-weight: bold")
+        self.caseInfoFrameLayout.addWidget(self.vascularFactorLabel, 0, 1)
         self.vascularFactorSlider = qt.QSlider()
         self.vascularFactorSlider.orientation = 2  # Vertical
         self.vascularFactorSlider.value = 5
@@ -114,9 +114,9 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
        # self.vascularFactorSlider.setToolTip("Move the slider for a fine tuning segmentation")
         self.caseInfoFrameLayout.addWidget(self.vascularFactorSlider, 1, 1, 4, 1, 0x0004)
 
-        label = qt.QLabel("Enhancement factor")
-        label.setStyleSheet("font-weight: bold")
-        self.caseInfoFrameLayout.addWidget(label, 0, 2)
+        self.enhancementFactorLabel = qt.QLabel("Enhancement factor")
+        self.enhancementFactorLabel.setStyleSheet("font-weight: bold")
+        self.caseInfoFrameLayout.addWidget(self.enhancementFactorLabel, 0, 2)
         self.enhancementFactorSlider = qt.QSlider()
         self.enhancementFactorSlider.orientation = 2  # Vertical
         self.enhancementFactorSlider.minimum = 0
@@ -287,7 +287,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.EndCloseEvent, self.__onSceneClosed__)
 
         # Set default layout Red
-        SlicerUtil.changeLayout(6)
+        SlicerUtil.changeLayoutRedSingle()
 
         self.refreshUI()
 
@@ -296,33 +296,23 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         return self.logic.current2DVectorVolume is not None
 
     def refreshUI(self):
-        # User mode or expert mode
-
-        #if self.expertMode.checked:
-            # Expert mode
-            # Hide toolbars
-         #   SlicerUtil.showToolbars(False)
-            # Hide slice bars
         SlicerUtil.showToolbars(self.isExpertMode)
         lm = slicer.app.layoutManager()
-        controller = lm.sliceWidget("Red").sliceController()
-        controller.showLabelOutline(True)
-        controller.visible = self.isExpertMode
-        controller = lm.sliceWidget("Yellow").sliceController()
-        controller.showLabelOutline(True)
-        controller.visible = self.isExpertMode
+        for key in ("Red", "Yellow"):
+            sliceWidget = lm.sliceWidget(key)
+            controller = sliceWidget.sliceController()
+            controller.showLabelOutline(True)
+            controller.visible = self.isExpertMode
+
+        # Hide DataProbe module
         dataProbeCollapsibleButton = [b for b in slicer.util.mainWindow().findChildren("ctkCollapsibleButton")
                                       if b.text == "Data Probe"][0]
         dataProbeCollapsibleButton.setVisible(self.isExpertMode)
-
 
         # Link windows
         compNodes = slicer.util.getNodes("vtkMRMLSliceCompositeNode*")
         for compNode in compNodes.itervalues():
             compNode.SetLinkedControl(True)
-            # compNode.SetLabelOpacity(0.3)
-
-        # self.__setLabelmapOutlines__()
 
         self.resetButton.visible = self.caseInfoFrame.visible = \
             self.editorCollapsibleButton.visible = self.diagnosisCollapsibleButton.visible = \
@@ -334,22 +324,28 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
             for button in self.showEnhancementCheckboxGroup.buttons():
                 button.setEnabled(self.logic.current2DVectorVolume is not None)
-        
-            # if self.showEnhancementCheckbox.isChecked():
-            #     # Two windows
-            #     SlicerUtil.changeLayout(29)
-            # else:
-            #     # Red Slice only
-            #     SlicerUtil.changeLayout(6)
+
             if self.showEnhancementCheckboxGroup.checkedId() == 0:
                 # Just original. Red Slice only
                 SlicerUtil.changeLayout(6)
+                # Hide enhancement fine tuning controls
+                self.vascularFactorLabel.visible = self.vascularFactorSlider.visible = \
+                    self.enhancementFactorLabel.visible = self.enhancementFactorSlider.visible = \
+                    False
             elif self.showEnhancementCheckboxGroup.checkedId() == 1:
                 # Original + Enhanced
                 SlicerUtil.changeLayout(29)
+                # Show enhancement fine tuning controls
+                self.vascularFactorLabel.visible = self.vascularFactorSlider.visible = \
+                    self.enhancementFactorLabel.visible = self.enhancementFactorSlider.visible = \
+                    True
             elif self.showEnhancementCheckboxGroup.checkedId() == 2:
                 # Just enhanced. Yellow Slice
                 SlicerUtil.changeLayout(7)
+                # Show enhancement fine tuning controls
+                self.vascularFactorLabel.visible = self.vascularFactorSlider.visible = \
+                    self.enhancementFactorLabel.visible = self.enhancementFactorSlider.visible = \
+                    True
 
     def setActiveVolumeId(self, volumeId, labelmapId=None):
         selectionNode = slicer.app.applicationLogic().GetSelectionNode()
@@ -505,7 +501,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
 
     def __onExpertModeStateChanged__(self, state):
         self.refreshUI()
-        
+
     def __onSceneClosed__(self, arg1, arg2):
         self.reset(False)
 #
@@ -579,7 +575,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
 
         # If the labelmap didn't exist, create a new one
         if self.currentLabelmapVolume is None:
-            nodeName = self.current2DVectorVolume.GetName() + "_label"
+            nodeName = os.path.basename(self.__getReportImagePath__(1)).replace(".png", "")
             self.currentLabelmapVolume = self.createNewLabelmap(self.currentScalarVolume, nodeName)
 
         # Use our customized colors
@@ -708,24 +704,32 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
 
 
     def __printSnapshots__(self):
-        """ Generate snapshots of all the volumes
+        """ Generate snapshots of all the volumes to be displayed in the report
         """
-        # Save a png file from the labelmap. We manipulate the widget to have the aspect that we want for the screenshot
+        # Save a png file from different images.
+        # We manipulate the widget to have the aspect that we want for the screenshot
         lm = slicer.app.layoutManager()
-        SlicerUtil.changeLayout(6)
-        controller = lm.sliceWidget("Red").sliceController()
+
+        # Take original image with Labelmap
+        # Change to Red
+        SlicerUtil.changeLayoutRedSingle()
+        sliceWidget = lm.sliceWidget("Red")
+        controller = sliceWidget.sliceController()
         controller.fitSliceToBackground()
         # Hide the slider bar (just show the picture)
         controller.hide()
+        sliceView = sliceWidget.sliceView()
+        sliceView.cornerAnnotation().ClearAllTexts()
+        sliceView.scheduleRender()
         # Take the snapshot
-        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.currentLabelmapVolume.GetName() + ".png"),
-                                slicer.qMRMLScreenShotDialog.Red)
+        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.__getReportImagePath__(1)),
+                                type=slicer.qMRMLScreenShotDialog.Red, hideAnnotations=True)
+
         # Restore the regular controller
         controller.show()
 
-        # Save a png file from the enhanced volume. We manipulate the widget to have the aspect that we want for the screenshot
-        lm = slicer.app.layoutManager()
-        SlicerUtil.changeLayout(7)
+        # Enhanced (with and without labelmap)
+        SlicerUtil.changeLayoutYellowSingle()
 
         # If the user didn't open the enhanced volume yet, force it
         enhancedVol = self.getEnhancedVolume()
@@ -742,10 +746,19 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         # Hide the slider bar (just show the picture)
         controller.hide()
         # Take the snapshot
-        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.currentEnhancedVolume.GetName() + ".png"),
-                                slicer.qMRMLScreenShotDialog.Yellow)
+        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.__getReportImagePath__(3)),
+                                type=slicer.qMRMLScreenShotDialog.Yellow, hideAnnotations=True)
+
+        # Remove the labelmap
+        controller.setLabelMapHidden(True)
+        # Take the snapshot
+        SlicerUtil.takeSnapshot(os.path.join(self.getCurrentDataFolder(), self.__getReportImagePath__(2)),
+                                type=slicer.qMRMLScreenShotDialog.Yellow, hideAnnotations=True)
+
+
         # Restore the regular controller
         controller.show()
+        controller.setLabelMapHidden(False)
 
     def printReport(self, currentValuesDict, callback):
         """ Generate a html report file and print it
@@ -789,6 +802,23 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
             self.callback(outputFileName)
             self.callback = None
 
+
+    def __getReportImagePath__(self, imageType):
+        if imageType==0:
+            # Original image
+            return self.current2DVectorVolume.GetStorageNode().GetFileName()
+        elif imageType==1:
+            # Original + Labelmap
+            return self.current2DVectorVolume.GetStorageNode().GetFileName() + "_label.png"
+        elif imageType==2:
+            # Enhanced only
+            return self.current2DVectorVolume.GetStorageNode().GetFileName() + "_enh.png"
+        elif imageType==3:
+            # Enhanced labeled
+            return self.current2DVectorVolume.GetStorageNode().GetFileName() + "_enh_label.png"
+        else:
+            raise AttributeError("Invalid image type ({0})".format(imageType))
+
     def __generateHtml__(self, currentValuesDict):
         """ Generate an html report based on the default template
         :param currentValuesDict: text of the report
@@ -802,9 +832,12 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         html = html.replace(self.getKey("Resources Folder"), self.getResourcePath())
 
         # VA
-        for key in ("OS", "OD", "VA Modality"):
-            key = self.getKey("OS")
-            html = html.replace(key, currentValuesDict[key])
+        for key in ("OS", "OD"):
+            key = self.getKey(key)
+            repl = currentValuesDict[key] if currentValuesDict[key] else "-"
+            html = html.replace(key, repl)
+        repl = currentValuesDict[self.getKey("VA Modality")] if currentValuesDict[self.getKey("VA Modality")] else ""
+        html = html.replace(self.getKey("VA Modality"), repl)
 
         # Problems
         for key in (self.getKey("Microaneurysms"), self.getKey("Exudates"), self.getKey("Haemorrhages"),
@@ -815,16 +848,17 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         html = html.replace(self.getKey("Diabetic Retinopathy Score"), str(currentValuesDict[self.getKey("Diabetic Retinopathy Score")]))
 
         # Images
-        html = html.replace(self.getKey("Image Original"), self.current2DVectorVolume.GetStorageNode().GetFileName())
-        html = html.replace(self.getKey("Image Annotated"), self.currentLabelmapVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
-        html = html.replace(self.getKey("Image Enhanced"), self.currentEnhancedVolume.GetStorageNode().GetFileName().replace(".nrrd", ".png"))
+        html = html.replace(self.getKey("Image Original"), self.__getReportImagePath__(0))
+        html = html.replace(self.getKey("Image Labeled"),  self.__getReportImagePath__(1))
+        html = html.replace(self.getKey("Image Enhanced"), self.__getReportImagePath__(2))
+        html = html.replace(self.getKey("Image Enhanced Labeled"), self.__getReportImagePath__(3))
 
         # Additional comments
-        html = html.replace(self.getKey("Additional comments"), self.__toHtml__(currentValuesDict[self.getKey("Additional comments")]))
+        html = html.replace(self.getKey("Additional comments"), self.__textEncodeToHtml__(currentValuesDict[self.getKey("Additional comments")]))
 
         return html
 
-    def __toHtml__(self, text):
+    def __textEncodeToHtml__(self, text):
         """ Encode a plain text in html
         :param text:
         :return:
