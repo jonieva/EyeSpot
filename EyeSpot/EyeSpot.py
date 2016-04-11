@@ -271,7 +271,7 @@ class EyeSpotWidget(ScriptedLoadableModuleWidget):
         self.layout.addWidget(self.expertModeCollapsibleButton)
         self.expertModeLayout = qt.QVBoxLayout(self.expertModeCollapsibleButton)
         self.expertModeCheckbox = qt.QCheckBox("Activate expert mode")
-        self.expertModeCheckbox.checked = True
+        self.expertModeCheckbox.checked = False
         self.expertModeLayout.addWidget(self.expertModeCheckbox)
         self.layout.addStretch(1)
 
@@ -545,13 +545,18 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
         """
         properties = {}
         properties['singleFile'] = True
-        dirName = os.path.basename(os.path.normpath(directory))
+        dirName = os.path.basename(os.path.normpath(directory)).lower()
+        print("dirName: " + dirName)
         for f in os.listdir(directory):
-            if f in (dirName + ".png", dirName + ".tiff"):
+            print("Analyzing " + f)
+            # fileExtension = f.split(".")[-1]
+            if f.lower() in (dirName + ".png", dirName + ".tiff", dirName + ".jpg"):
                 # Load the main image
                 p = os.path.join(directory, f)
+                print("Loading file " + p)
                 (loaded, volume) = slicer.util.loadVolume(p, properties, returnNode=True)
                 if loaded:
+                    logging.debug("volume loaded")
                     self.current2DVectorVolume = volume
                     # Make sure that the volume is named as the directory to avoid wrong names
                     self.current2DVectorVolume.SetName(dirName)
@@ -564,7 +569,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
                 (loaded, volume) = slicer.util.loadLabelVolume(p, returnNode=True)
                 if loaded:
                     self.currentLabelmapVolume = volume
-            # TODO: reuse already calculated enhanced volume. We will need to calculate the needed matrixes
+            # TODO: reuse previously calculated enhanced volume. We will need to calculate the needed matrixes
             # elif f == dirName + "_enh.nrrd":
             #     # Load a previously existing enhanced volume
             #     p = os.path.join(directory, f)
@@ -581,6 +586,7 @@ class EyeSpotLogic(ScriptedLoadableModuleLogic):
 
         # If the labelmap didn't exist, create a new one
         if self.currentLabelmapVolume is None:
+            # Remove file extension
             nodeName = os.path.basename(self.__getReportImagePath__(1)).replace(".png", "")
             self.currentLabelmapVolume = self.createNewLabelmap(self.currentScalarVolume, nodeName)
 
