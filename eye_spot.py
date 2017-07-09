@@ -73,7 +73,6 @@ class EyeSpot(object):
             # v = np.ones((s,s), np.double) / (s**2)
             # i = dummy
             # m = signal.convolve2d (i, v, mode="same")
-            #
             # util.plota(m)
 
 if __name__ == "__main__":
